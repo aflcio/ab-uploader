@@ -130,3 +130,9 @@ dmypy.json
 
 # VScode settings
 .vscode
+
+# Serverless directories
+.serverless
+
+bin/
+node_modules/

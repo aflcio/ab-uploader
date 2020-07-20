@@ -1,0 +1,23 @@
+{
+  "name": "ab-uploader",
+  "version": "1.0.0",
+  "description": "Action Builder Uploader",
+  "main": "upload.py",
+  "dependencies": {
+    "serverless-python-requirements": "^5.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aflcio/ab-uploader.git"
+  },
+  "author": "Jeff Mann",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/aflcio/ab-uploader/issues"
+  },
+  "homepage": "https://github.com/aflcio/ab-uploader#readme"
+}
