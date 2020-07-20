@@ -22,7 +22,7 @@ org: aflcio
 
 provider:
   name: aws
-  runtime: python3.8
+  runtime: python3.7
 
 # you can overwrite defaults here
 #  stage: dev
@@ -61,9 +61,9 @@ custom:
     slim: true
     layer: true
 
-# layers:
-#   chrome:
-#     path: chromelayer
+layers:
+  chrome:
+    path: chromelayer
 
 package:
   individually: false
@@ -71,14 +71,17 @@ package:
     - '!./**'
     - 'upload.py'
     - 'handler.py'
+    - 'bin/**'
+    - 'lib/**'
   exclude:
     - '**'
 
 functions:
-  hello:
-    handler: handler.hello
+  test:
+    handler: handler.test
     layers:
       - { Ref: PythonRequirementsLambdaLayer }
+      - { Ref: ChromeLambdaLayer }
 #    events:
 #      - s3: ${env:BUCKET}
 

@@ -136,3 +136,4 @@ dmypy.json
 
 bin/
 node_modules/
+!/chromelayer/lib/
