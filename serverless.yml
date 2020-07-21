@@ -1,62 +1,24 @@
-# Welcome to Serverless!
-#
-# This file is the main config file for your service.
-# It's very minimal at this point and uses default values.
-# You can always add more config options for more control.
-# We've included some commented out config examples here.
-# Just uncomment any of them to get that config option.
-#
-# For full config options, check the docs:
-#    docs.serverless.com
-#
-# Happy Coding!
-
 service: ab-uploader
-# app and org for use with dashboard.serverless.com
 app: ab-uploader
 org: aflcio
-
-# You can pin your service to only deploy with a specific Serverless version
-# Check out our docs for more details
-# frameworkVersion: "=X.X.X"
 
 provider:
   name: aws
   runtime: python3.7
-
-# you can overwrite defaults here
-#  stage: dev
-#  region: us-east-1
-
-# you can add statements to the Lambda function's IAM Role here
-#  iamRoleStatements:
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:ListBucket"
-#      Resource: { "Fn::Join" : ["", ["arn:aws:s3:::", { "Ref" : "ServerlessDeploymentBucket" } ] ]  }
-#    - Effect: "Allow"
-#      Action:
-#        - "s3:PutObject"
-#      Resource:
-#        Fn::Join:
-#          - ""
-#          - - "arn:aws:s3:::"
-#            - "Ref" : "ServerlessDeploymentBucket"
-#            - "/*"
-
-# you can define service wide environment variables here
-#  environment:
-#    variable1: value1
+  environment:
+    S3_UPLOAD_BUCKET: ${self:service}-${opt:stage, self:provider.stage}-uploads
+  iamRoleStatements:
+    - Effect: "Allow"
+      Action:
+        - "s3:GetObject"
+      Resource:
+        - 'arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*'
 
 plugins:
   - serverless-python-requirements
 
 custom:
   pythonRequirements:
-    dockerFile: ./Dockerfile
-    dockerExtraFiles:
-      - /chrome/chromedriver
-      - /chrome/headless-chromium
     dockerizePip: non-linux
     slim: true
     layer: true
@@ -82,21 +44,15 @@ functions:
     layers:
       - { Ref: PythonRequirementsLambdaLayer }
       - { Ref: ChromeLambdaLayer }
-#    events:
-#      - s3: ${env:BUCKET}
-
-#    Define function environment variables here
-#    environment:
-#      variable2: value2
-
-# you can add CloudFormation resource templates here
-resources:
- Resources:
-   NewResource:
-     Type: AWS::S3::Bucket
-     Properties:
-       BucketName: ab-uploader
-#  Outputs:
-#     NewOutput:
-#       Description: "Description for the output"
-#       Value: "Some output value"
+  upload:
+    handler: handler.upload_handler
+    layers:
+      - { Ref: PythonRequirementsLambdaLayer }
+      - { Ref: ChromeLambdaLayer }
+    timeout: 900
+    events:
+      - s3:
+          bucket: ${self:provider.environment.S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .csv

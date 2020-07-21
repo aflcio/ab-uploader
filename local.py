@@ -7,10 +7,9 @@ load_dotenv()
 upload_file = '/Users/jmann/Desktop/AB Data/Sample:Demo/Auto Upload Test Data.csv'
 
 uploader = ABUploader(driver=webdriver.Chrome(),
-                      config_file='fields.example.yml',
+                      config_file='config.example.yml',
                       upload_file=upload_file,
-                      instance=os.getenv('AB_INSTANCE'),
-                      campaign='Upload Test')
+                      campaign_key='upload-test')
 # uploader.login()
 # uploader.start_upload('people')
 # uploader.confirm_upload()

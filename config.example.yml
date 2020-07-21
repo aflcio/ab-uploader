@@ -1,0 +1,43 @@
+instance: aflciodemo
+
+default_field_map: &default_field_map
+  people: &default_people_map
+      id: Custom ID
+      first_name: First Name
+      last_name: Last Name
+      email: Email
+      cell: Phone Number
+      phone_type: Phone Number Type
+      address: Address
+      city: City
+      state: State
+      zip: Zip
+  info: &default_info_map
+    local:
+      type: Field
+      name: Local
+    sector:
+      type: Field
+      name: Sector
+    notes:
+      type: Field
+      name: Notes Category
+    notes_note:
+      type: Notes
+      name: Notes Category
+
+upload-test:
+  campaign_name: Upload Test
+  fields:
+    <<: *default_field_map
+
+campaign-foo:
+  campaign_name: Foo Campaign
+  fields:
+    people:
+      <<: *default_people_map
+    info:
+      <<: *default_info_map
+      foo:
+        type: Field
+        name: Foo

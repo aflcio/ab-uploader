@@ -7,21 +7,24 @@ import yaml
 
 class ABUploader:
 
-    def __init__(self, driver, config_file, instance, campaign, upload_file):
+    def __init__(self, driver, config_file, campaign_key, upload_file):
         self.driver = driver
-        self.campaign = campaign
         self.upload_file = upload_file
-        self.BASE_URL = 'https://%s.actionbuilder.org' % instance
         if config_file:
             with open(config_file) as file:
-                self.FIELD_MAP = yaml.load(file, Loader=yaml.FullLoader)
+                config = yaml.load(file, Loader=yaml.FullLoader)
+            if campaign_key not in config:
+                raise Exception('Could not find campaign %s in config file' % campaign_key)
+            self.CAMPAIGN_NAME = config[campaign_key]['campaign_name']
+            self.FIELD_MAP = config[campaign_key]['fields']
+            self.BASE_URL = 'https://%s.actionbuilder.org' % config['instance']
 
     def login(self):
         driver = self.driver
         driver.get(self.BASE_URL + '/login')
         WebDriverWait(driver, 10).until(EC.title_contains("Login"))
-        driver.find_element_by_id('email').send_keys(os.getenv('AN_LOGIN'))
-        driver.find_element_by_id('password').send_keys(os.getenv('AN_PASSWORD'))
+        driver.find_element_by_id('email').send_keys(os.getenv('AB_LOGIN'))
+        driver.find_element_by_id('password').send_keys(os.getenv('AB_PASSWORD'))
         driver.find_element_by_id('loginButton').click()
         WebDriverWait(driver, 10).until(EC.title_contains("List"))
 
@@ -36,7 +39,7 @@ class ABUploader:
         driver.find_element_by_css_selector('input[type="file"]').send_keys(self.upload_file)
         # Select campaign
         driver.find_element(
-            By.XPATH, "//mat-select[@data-test-id='campaignUploadSelect']").send_keys(self.campaign)
+            By.XPATH, "//mat-select[@data-test-id='campaignUploadSelect']").send_keys(self.CAMPAIGN_NAME)
         # Select ID for matching
         ID_SOURCE = (By.XPATH, "//mat-select[@placeholder='Id to use for matching']")
         ID_DEST = (By.XPATH, "//mat-select[@placeholder='Upload Column'][@aria-disabled='false']")
@@ -54,6 +57,7 @@ class ABUploader:
                         field.find_element(
                             By.TAG_NAME, 'mat-select').send_keys(self.FIELD_MAP[type][column])
             driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
+            print('---Fields mapped for %s upload---' % type)
         if type is 'info':
             WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
             driver.find_element(*ID_DEST).send_keys('id')
@@ -79,6 +83,7 @@ class ABUploader:
             WebDriverWait(driver, 10).until(EC.title_contains('Upload Confirm'))
             driver.find_element(
                 By.XPATH, '//app-upload-tags-confirm-create-tags//button').click()
+            print('---Fields mapped for %s upload---' % type)
 
 
     def confirm_upload(self):
@@ -94,13 +99,14 @@ class ABUploader:
         for checkbox in driver.find_elements(By.XPATH, '//mat-checkbox//label'):
             checkbox.click()
         driver.find_element(By.CSS_SELECTOR, 'app-upload-confirm button').click()
+        print('---Starting Upload---')
 
 
     def finish_upload(self):
         driver = self.driver
         # Wait for upload to complete
         STATUS_LOCATOR = (
-            By.XPATH, "//app-upload-list//a[text()='%s']/../following-sibling::div[2]" % self.campaign)
+            By.XPATH, "//app-upload-list//a[text()='%s']/../following-sibling::div[2]" % self.CAMPAIGN_NAME)
         retries = 10
         timeout = 5
         while retries > 0:
@@ -114,7 +120,7 @@ class ABUploader:
                 retries -= 1
                 timeout *= 2
                 print('Upload in progress. %d retries remaining' % retries)
-        print("Upload Complete")
+        print("---Upload Complete---")
 
     def quit(self):
         self.driver.quit()
