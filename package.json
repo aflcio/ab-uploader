@@ -3,10 +3,12 @@
   "version": "1.0.0",
   "description": "Action Builder Uploader",
   "main": "upload.py",
-  "dependencies": {
-    "serverless-python-requirements": "^5.1.0"
+  "dependencies": {},
+  "devDependencies": {
+    "serverless-iam-roles-per-function": "^2.0.2",
+    "serverless-python-requirements": "^5.1.0",
+    "serverless-step-functions": "^2.21.1"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
