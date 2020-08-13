@@ -10,7 +10,8 @@
     "serverless-step-functions": "^2.21.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "./get_chrome.sh"
   },
   "repository": {
     "type": "git",
