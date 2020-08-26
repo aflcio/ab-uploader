@@ -41,6 +41,10 @@ campaign-foo:
       ab_type: Custom ID
     people:
       <<: *default_people_map
+    people2:
+      first_name: First Name
+      phone2: Phone Number
+      phone_type2: Phone Number Type
     info:
       <<: *default_info_map
       foo:

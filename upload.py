@@ -48,9 +48,9 @@ class ABUploader:
 
     def start_upload(self, upload_type):
         driver = self.driver
-        if upload_type == 'people':
+        if 'people' in upload_type:
             driver.get(self.BASE_URL + '/admin/upload/people/mapping')
-        if upload_type == 'info':
+        if 'info' in upload_type:
             driver.get(self.BASE_URL + '/admin/upload/tags/mapping')
         print("Starting %s upload" % upload_type)
         WebDriverWait(driver, 20).until(EC.title_contains("Upload"))
@@ -67,7 +67,7 @@ class ABUploader:
         driver.find_element(*ID_SOURCE).send_keys(self.FIELD_MAP['id']['ab_type'])
         # Map Fields
         print("Mapping fields...")
-        if upload_type == 'people':
+        if 'people' in upload_type:
             col_name = (By.CSS_SELECTOR, '.mapping__col--source input')
             fields = driver.find_elements_by_class_name('mapping')
             for field in fields[:-2]:  # last two are notification and button
@@ -80,7 +80,7 @@ class ABUploader:
                     if map_to:
                         field.find_element(By.TAG_NAME, 'mat-select').send_keys(map_to)
             driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
-        if upload_type == 'info':
+        if 'info' in upload_type:
             WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
             driver.find_element(*ID_DEST).send_keys(self.FIELD_MAP['id']['column'])
             WebDriverWait(driver, 5).until(lambda d: len(d.find_elements(*FIELD_SOURCE)) > 1)

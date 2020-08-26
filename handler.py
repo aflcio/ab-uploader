@@ -38,6 +38,8 @@ def s3_handler(event, context):
     # Read config file
     s3_client.download_file(bucket, 'config.yml', '/tmp/config.yml')
     config = ABUploader.parse_config('/tmp/config.yml', campaign_key)
+    uploads = list(config['field_map'])
+    uploads.remove('id')
     sfn_client.start_execution(
         stateMachineArn=os.getenv('stateMachineArn'),
         input=json.dumps({
@@ -46,7 +48,8 @@ def s3_handler(event, context):
             },
             "bucket": bucket,
             "campaign_key": campaign_key,
-            "file_key": file_key
+            "file_key": file_key,
+            "uploads_todo": uploads
         })
     )
     return {
@@ -62,9 +65,8 @@ def start_upload(event, context):
         event['file_key'],
         file_path
     )
-    # Do people upload unless specified
-    if 'upload_type' not in event:
-        event['upload_type'] = 'people'
+
+    event['upload_type'] = event['uploads_todo'].pop(0)
     uploader = ABUploader(config=event['config'],
                           upload_file=file_path,
                           chrome_options=chrome_options())
@@ -87,7 +89,9 @@ def check_upload_status(event, context):
     else:
         event['retries_left'] -= 1
         event['wait_time'] *= 2
-    if status == 'Complete':
+    if 'Complete' in status:
         del event['wait_time'], event['retries_left']
+        if not len(event['uploads_todo']):
+            del event['uploads_todo']
         print("---Upload Complete---")
     return event

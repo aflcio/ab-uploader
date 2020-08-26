@@ -108,22 +108,17 @@ stepFunctions:
             Choices:
             - And:
                 - Variable: $.upload_status
-                  StringEquals: Complete
-                - Variable: $.upload_type
-                  StringEquals: people
-              Next: UploadInfo
+                  StringMatches: Complete*
+                - Variable: $.uploads_todo
+                  IsPresent: true
+              Next: StartUpload
             - Variable: "$.upload_status"
-              StringEquals: Complete
+              StringMatches: Complete*
               Next: AllSet
             - Variable: "$.retries_left"
               NumericGreaterThan: 0
               Next: WaitForUpload
             Default: GiveUp
-          UploadInfo:
-            Type: Pass
-            Result: info
-            ResultPath: "$.upload_type"
-            Next: StartUpload
           GiveUp:
             Type: Fail
             Cause: "Upload never finished"
