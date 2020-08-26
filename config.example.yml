@@ -1,8 +1,10 @@
 instance: aflciodemo
 
 default_field_map: &default_field_map
+  id:
+    column: id
+    ab_type: Custom ID
   people: &default_people_map
-      id: Custom ID
       first_name: First Name
       last_name: Last Name
       email: Email
@@ -34,6 +36,9 @@ upload-test:
 campaign-foo:
   campaign_name: Foo Campaign
   fields:
+    id:
+      column: id
+      ab_type: Custom ID
     people:
       <<: *default_people_map
     info:

@@ -64,7 +64,7 @@ class ABUploader:
         ID_DEST = (By.XPATH, "//mat-select[@placeholder='Upload Column'][@aria-disabled='false']")
         FIELD_SOURCE = (By.CLASS_NAME, 'mapping__col--source')
         WebDriverWait(driver, 5).until(EC.element_to_be_clickable(ID_SOURCE))
-        driver.find_element(*ID_SOURCE).send_keys('Custom ID')
+        driver.find_element(*ID_SOURCE).send_keys(self.FIELD_MAP['id']['ab_type'])
         # Map Fields
         print("Mapping fields...")
         if upload_type == 'people':
@@ -73,13 +73,16 @@ class ABUploader:
             for field in fields[:-2]:  # last two are notification and button
                 if field.find_elements(*col_name):
                     column = field.find_element(*col_name).get_attribute('value')
-                    if column in self.FIELD_MAP[upload_type]:
-                        field.find_element(
-                            By.TAG_NAME, 'mat-select').send_keys(self.FIELD_MAP[upload_type][column])
+                    if column == self.FIELD_MAP['id']['column']:
+                        map_to = self.FIELD_MAP['id']['ab_type']
+                    else:
+                        map_to = self.FIELD_MAP[upload_type].get(column)
+                    if map_to:
+                        field.find_element(By.TAG_NAME, 'mat-select').send_keys(map_to)
             driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
         if upload_type == 'info':
             WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
-            driver.find_element(*ID_DEST).send_keys('id')
+            driver.find_element(*ID_DEST).send_keys(self.FIELD_MAP['id']['column'])
             WebDriverWait(driver, 5).until(lambda d: len(d.find_elements(*FIELD_SOURCE)) > 1)
             fields = driver.find_elements(*FIELD_SOURCE)
             for field in fields[1:]:
@@ -91,17 +94,25 @@ class ABUploader:
                     driver.find_element(By.TAG_NAME, 'mat-option') \
                         .send_keys(self.FIELD_MAP[upload_type][col_name]['type'])
                     driver.find_element(By.TAG_NAME, 'mat-option').click()
-                    dest.find_element(By.XPATH, './/input') \
-                        .send_keys(self.FIELD_MAP[upload_type][col_name]['name'])
-                    dest.find_element(By.XPATH, './/ul').click()
-                    dest.find_element(By.XPATH, './/ul//ul').click()
+                    field_span = dest.find_element(By.XPATH, './/span[text()="%s"]' \
+                        % self.FIELD_MAP[upload_type][col_name]['name'])
+                    field_span.find_element(By.XPATH, './ancestor-or-self::li').click()
+                    field_span.click()
             driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Map Response'))
             driver.find_element(
                 By.XPATH, '//app-upload-tag-categories-mapping/div/div/button').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Upload Confirm'))
-            driver.find_element(
-                By.XPATH, '//app-upload-tags-confirm-create-tags//button').click()
+            CONF_LOCATOR = (
+                By.XPATH, '//app-upload-tags-confirm-create-tags//button')
+            checkboxes = driver.find_elements(
+                By.XPATH, '//app-upload-tags-confirm-create-tags//mat-checkbox')
+            if len(checkboxes) > 0:
+                for checkbox in checkboxes:
+                    checkbox.click()
+                driver.find_element(*CONF_LOCATOR).click()
+                WebDriverWait(driver, 300).until(EC.element_to_be_clickable(CONF_LOCATOR))
+            driver.find_element(*CONF_LOCATOR).click()
         print('---Fields mapped for %s upload---' % upload_type)
 
 
