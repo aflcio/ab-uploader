@@ -1,4 +1,5 @@
 import os
+import time
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.support import expected_conditions as EC
@@ -79,7 +80,9 @@ class ABUploader:
                         map_to = self.FIELD_MAP[upload_type].get(column)
                     if map_to:
                         field.find_element(By.TAG_NAME, 'mat-select').send_keys(map_to)
+            time.sleep(3)
             driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
+
         if 'info' in upload_type:
             WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
             driver.find_element(*ID_DEST).send_keys(self.FIELD_MAP['id']['column'])
@@ -112,7 +115,11 @@ class ABUploader:
                     checkbox.click()
                 driver.find_element(*CONF_LOCATOR).click()
                 WebDriverWait(driver, 300).until(EC.element_to_be_clickable(CONF_LOCATOR))
+            time.sleep(3)
             driver.find_element(*CONF_LOCATOR).click()
+
+        # Make sure the "processing" button worked
+        WebDriverWait(driver, 30).until(EC.url_changes(driver.current_url))
         print('---Fields mapped for %s upload---' % upload_type)
 
 

@@ -94,6 +94,8 @@ stepFunctions:
             Resource:
               Fn::GetAtt: [start_upload, Arn]
             Next: WaitForUpload
+            Retry:
+              - ErrorEquals: [TimeoutException]
           WaitForUpload:
             Type: Wait
             SecondsPath: "$.wait_time"
@@ -103,6 +105,8 @@ stepFunctions:
             Resource:
               Fn::GetAtt: [check_status, Arn]
             Next: UploadStatusChoice
+            Retry:
+              - ErrorEquals: [TimeoutException]
           UploadStatusChoice:
             Type: Choice
             Choices:
