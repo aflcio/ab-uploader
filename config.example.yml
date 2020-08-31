@@ -17,7 +17,7 @@ default_field_map: &default_field_map
   info: &default_info_map
     local:
       type: Field
-      name: Local
+      name: 'Local #'
     sector:
       type: Field
       name: Sector

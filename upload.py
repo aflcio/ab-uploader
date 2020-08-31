@@ -1,3 +1,4 @@
+import csv
 import os
 import time
 from selenium import webdriver
@@ -20,6 +21,18 @@ class ABUploader:
         if not no_login: self.login()
 
 
+    def txt_to_csv(txt_file):
+        csv_file = txt_file.replace('.txt', '.csv')
+        with open(txt_file, "r") as in_text, open(csv_file, "w") as out_csv:
+            # Strip <NUL> characters
+            data = (line.replace('\0', '') for line in in_text)
+            in_reader = csv.reader(data, delimiter='\t')
+            out_writer = csv.writer(out_csv)
+            for row in in_reader:
+                out_writer.writerow(row)
+        return csv_file
+
+
     def parse_config(config_path, campaign_key):
         with open(config_path) as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
@@ -31,6 +44,7 @@ class ABUploader:
             "campaign_name": config[campaign_key]['campaign_name'],
             "field_map": config[campaign_key]['fields']
         }
+
 
     def login(self):
         driver = self.driver
@@ -46,6 +60,7 @@ class ABUploader:
         driver.find_element_by_id('loginButton').click()
         WebDriverWait(driver, 20).until_not(EC.title_contains("Login"))
         print("Logged in succesfully")
+
 
     def start_upload(self, upload_type):
         driver = self.driver
@@ -97,7 +112,7 @@ class ABUploader:
                     driver.find_element(By.TAG_NAME, 'mat-option') \
                         .send_keys(self.FIELD_MAP[upload_type][col_name]['type'])
                     driver.find_element(By.TAG_NAME, 'mat-option').click()
-                    field_span = dest.find_element(By.XPATH, './/span[text()="%s"]' \
+                    field_span = dest.find_element(By.XPATH, './/span[normalize-space(text())="%s"]'
                         % self.FIELD_MAP[upload_type][col_name]['name'])
                     field_span.find_element(By.XPATH, './ancestor-or-self::li').click()
                     field_span.click()
@@ -169,8 +184,10 @@ class ABUploader:
                 print('Upload in progress. %d retries remaining' % retries)
         print("---Upload Complete---")
 
+
     def quit(self):
         self.driver.quit()
+
 
     def test(self):
         print('Title: %s' % self.driver.title)

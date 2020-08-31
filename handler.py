@@ -7,7 +7,6 @@ from upload import ABUploader
 
 s3_client = boto3.client('s3')
 
-
 def chrome_options():
     chrome_options = webdriver.ChromeOptions()
     chrome_options.add_argument('--headless')
@@ -29,17 +28,38 @@ def chrome_options():
     chrome_options.binary_location = "/opt/bin/headless-chromium"
     return chrome_options
 
+
 def s3_handler(event, context):
-    sfn_client = boto3.client('stepfunctions')
     record = event['Records'][0]
     bucket = record['s3']['bucket']['name']
     file_key = unquote_plus(record['s3']['object']['key'])
+    file_type = file_key[-3:]
+    if file_type == 'txt':
+        handle_txt(bucket, file_key)
+    if file_type == 'csv':
+        handle_csv(bucket, file_key)
+    return {
+        "message": "File received: %s" % file_key,
+        "event": event
+    }
+
+
+def handle_txt(bucket, file_key):
+    txt_path = '/tmp/%s' % file_key
+    s3_client.download_file(bucket, file_key, txt_path)
+    csv_path = ABUploader.txt_to_csv(txt_path)
+    s3_client.upload_file(csv_path, bucket, file_key.replace('.txt', '.csv'))
+
+
+def handle_csv(bucket, file_key):
+    sfn_client = boto3.client('stepfunctions')
     campaign_key = file_key.split('_')[0]
     # Read config file
     s3_client.download_file(bucket, 'config.yml', '/tmp/config.yml')
     config = ABUploader.parse_config('/tmp/config.yml', campaign_key)
     uploads = list(config['field_map'])
     uploads.remove('id')
+    # Start state machine
     sfn_client.start_execution(
         stateMachineArn=os.getenv('stateMachineArn'),
         input=json.dumps({
@@ -52,10 +72,7 @@ def s3_handler(event, context):
             "uploads_todo": uploads
         })
     )
-    return {
-        "message": "File received: %s" % file_key,
-        "event": event
-    }
+
 
 def start_upload(event, context):
     # Retrieve file to upload

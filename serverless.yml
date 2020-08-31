@@ -54,6 +54,7 @@ functions:
       - Effect: "Allow"
         Action:
           - "s3:GetObject"
+          - "s3:PutObject"
         Resource:
           - 'arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*'
       - Effect: "Allow"
@@ -67,6 +68,11 @@ functions:
           event: s3:ObjectCreated:*
           rules:
             - suffix: .csv
+      - s3:
+          bucket: ${self:provider.environment.S3_UPLOAD_BUCKET}
+          event: s3:ObjectCreated:*
+          rules:
+            - suffix: .txt
   start_upload:
     handler: handler.start_upload
     layers:
