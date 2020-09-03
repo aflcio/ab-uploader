@@ -9,6 +9,14 @@ provider:
     S3_UPLOAD_BUCKET: ${self:service}-${opt:stage, self:provider.stage}-uploads
     AB_LOGIN: ${param:ab_login}
     AB_PASSWORD: ${param:ab_pass}
+  s3:
+    uploadBucket:
+      name: ${self:provider.environment.S3_UPLOAD_BUCKET}
+      publicAccessBlockConfiguration:
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+        BlockPublicPolicy: true
+
   iamRoleStatements:
     - Effect: "Allow"
       Action:
@@ -142,3 +150,23 @@ resources:
       Description: The ARN of the uploader state machine
       Value:
         Ref: AbUploadMachine
+  Resources:
+    S3UploadBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: ${self:provider.environment.S3_UPLOAD_BUCKET}
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: Allow
+              Action:
+                - "s3:DeleteObject"
+                - "s3:GetObject"
+                - "s3:ListBucket"
+                - "s3:PutObject"
+                - "s3:PutObjectAcl"
+              Resource:
+                - 'arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}'
+                - 'arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*'
+              Principal:
+                AWS: ${param:s3_user}
