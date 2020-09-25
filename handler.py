@@ -34,6 +34,7 @@ def s3_handler(event, context):
     bucket = record['s3']['bucket']['name']
     file_key = unquote_plus(record['s3']['object']['key'])
     file_type = file_key[-3:]
+    print('Received file: %s' % file_key)
     if file_type == 'txt':
         handle_txt(bucket, file_key)
     if file_type == 'csv':
@@ -47,8 +48,12 @@ def s3_handler(event, context):
 def handle_txt(bucket, file_key):
     txt_path = '/tmp/%s' % file_key
     s3_client.download_file(bucket, file_key, txt_path)
-    csv_path = ABUploader.txt_to_csv(txt_path)
-    s3_client.upload_file(csv_path, bucket, file_key.replace('.txt', '.csv'))
+    try:
+        csv_path = ABUploader.txt_to_csv(txt_path)
+        s3_client.upload_file(csv_path, bucket, file_key.replace('.txt', '.csv'))
+    except:
+        print('Failed to convert file: %s' % file_key)
+        raise
 
 
 def handle_csv(bucket, file_key):
@@ -87,6 +92,8 @@ def start_upload(event, context):
     uploader = ABUploader(config=event['config'],
                           upload_file=file_path,
                           chrome_options=chrome_options())
+    print('---Starting Upload: %s - %s---' %
+          (event['campaign_key'], event['upload_type']))
     uploader.start_upload(event['upload_type'])
     uploader.confirm_upload()
     event['wait_time'] = 30
@@ -110,5 +117,5 @@ def check_upload_status(event, context):
         del event['wait_time'], event['retries_left']
         if not len(event['uploads_todo']):
             del event['uploads_todo']
-        print("---Upload Complete---")
+        print('---Upload Complete: %s - %s---' % (event['campaign_key'], event['upload_type']))
     return event

@@ -3,6 +3,7 @@ import os
 import time
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -112,10 +113,15 @@ class ABUploader:
                     driver.find_element(By.TAG_NAME, 'mat-option') \
                         .send_keys(self.FIELD_MAP[upload_type][col_name]['type'])
                     driver.find_element(By.TAG_NAME, 'mat-option').click()
-                    field_span = dest.find_element(By.XPATH, './/span[normalize-space(text())="%s"]'
-                        % self.FIELD_MAP[upload_type][col_name]['name'])
-                    field_span.find_element(By.XPATH, './ancestor-or-self::li').click()
-                    field_span.click()
+                    try:
+                        field_span = dest.find_element(By.XPATH, './/span[normalize-space(text())="%s"]'
+                            % self.FIELD_MAP[upload_type][col_name]['name'])
+                        field_span.find_element(By.XPATH, './ancestor-or-self::li').click()
+                        field_span.click()
+                    except NoSuchElementException:
+                        # Clear dialog
+                        driver.find_element(By.TAG_NAME, 'body').click()
+                        dest.find_element(By.CSS_SELECTOR, '.mapping__reset').click()
             driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Map Response'))
             driver.find_element(
