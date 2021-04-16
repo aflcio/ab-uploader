@@ -1,7 +1,9 @@
 import boto3
 import json
 import os
+import time
 from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
 from urllib.parse import unquote_plus
 from upload import ABUploader
 
@@ -30,6 +32,7 @@ def chrome_options():
 
 
 def s3_handler(event, context):
+    # print(event['Records'])
     record = event['Records'][0]
     bucket = record['s3']['bucket']['name']
     file_key = unquote_plus(record['s3']['object']['key'])
@@ -64,10 +67,13 @@ def handle_csv(bucket, file_key):
     config = ABUploader.parse_config('/tmp/config.yml', campaign_key)
     uploads = list(config['field_map'])
     uploads.remove('id')
+    execution_name = '%s_%s' % (campaign_key, int(time.time()))
     # Start state machine
     sfn_client.start_execution(
         stateMachineArn=os.getenv('stateMachineArn'),
+        name=execution_name,
         input=json.dumps({
+            "execution_name": execution_name,
             "config": {
                 **config,
             },
@@ -77,6 +83,22 @@ def handle_csv(bucket, file_key):
             "uploads_todo": uploads
         })
     )
+
+
+def one_ata_time(event, context):
+    sfn_client = boto3.client('stepfunctions')
+    executions = sfn_client.list_executions(
+        stateMachineArn=os.getenv('stateMachineArn'),
+        statusFilter='RUNNING'
+    )['executions']
+    oldest = executions[-1]['name']
+    if event['execution_name'] == oldest:
+        print('%s GO!' % event['campaign_key'])
+        event['proceed'] = True
+    else:
+        print('%s waiting' % event['campaign_key'])
+        event['proceed'] = False
+    return event
 
 
 def start_upload(event, context):
@@ -95,7 +117,24 @@ def start_upload(event, context):
     print('---Starting Upload: %s - %s---' %
           (event['campaign_key'], event['upload_type']))
     uploader.start_upload(event['upload_type'])
-    uploader.confirm_upload()
+    # if event['upload_type'] == 'info':
+    #     # Confirm info uploads with snackbar
+    #     uploader.confirm_upload()
+    #     event['wait_type'] = 'upload'
+    # else:
+    #     # For person uploads, check upload list
+    #     event['wait_type'] = 'processing'
+
+    try:
+        # Try waiting for snackbar pop-up
+        uploader.confirm_upload()
+        event['wait_type'] = 'upload'
+        print('---Confirmed with snackbar: %s - %s---' %
+              (event['campaign_key'], event['upload_type']))
+    except TimeoutException:
+        # Fall back to checking status on upload list
+        event['wait_type'] = 'processing'
+    # event['wait_type'] = 'processing'
     event['wait_time'] = 30
     return event
 
@@ -113,9 +152,28 @@ def check_upload_status(event, context):
     else:
         event['retries_left'] -= 1
         event['wait_time'] *= 2
+    # Upload ready to be confirmed (Needs Confirmation/Review)
+    if 'Needs' in status:
+        uploader.confirm_upload(from_list=True)
+        print('---Confirmed Upload: %s - %s---' % (event['campaign_key'], event['upload_type']))
+        event['retries_left'] = 6
+        event['wait_time'] = 30
+        event['wait_type'] = 'upload'
+    # Upload is done
     if 'Complete' in status:
-        del event['wait_time'], event['retries_left']
+        del event['wait_time'], event['retries_left'], event['wait_type']
         if not len(event['uploads_todo']):
             del event['uploads_todo']
         print('---Upload Complete: %s - %s---' % (event['campaign_key'], event['upload_type']))
+    # Upload failed
+    if 'Failure' in status:
+        raise Exception('Upload failed')
+    return event
+
+
+def confirm_upload(event, context):
+    uploader = ABUploader(
+        config=event['config'], chrome_options=chrome_options())
+    uploader.confirm_upload(from_list=True)
+    del event['wait_time'], event['retries_left']
     return event

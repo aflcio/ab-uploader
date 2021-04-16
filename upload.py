@@ -69,7 +69,7 @@ class ABUploader:
             driver.get(self.BASE_URL + '/admin/upload/people/mapping')
         if 'info' in upload_type:
             driver.get(self.BASE_URL + '/admin/upload/tags/mapping')
-        print("Starting %s upload" % upload_type)
+        print("Starting %s upload: %s" % (upload_type, self.CAMPAIGN_NAME))
         WebDriverWait(driver, 20).until(EC.title_contains("Upload"))
         # Upload file
         driver.find_element_by_css_selector('input[type="file"]').send_keys(self.UPLOAD_FILE)
@@ -83,7 +83,7 @@ class ABUploader:
         WebDriverWait(driver, 5).until(EC.element_to_be_clickable(ID_SOURCE))
         driver.find_element(*ID_SOURCE).send_keys(self.FIELD_MAP['id']['ab_type'])
         # Map Fields
-        print("Mapping fields...")
+        print("Mapping %s fields: %s" % (upload_type, self.CAMPAIGN_NAME))
         if 'people' in upload_type:
             col_name = (By.CSS_SELECTOR, '.mapping__col--source input')
             fields = driver.find_elements_by_class_name('mapping')
@@ -132,28 +132,40 @@ class ABUploader:
             checkboxes = driver.find_elements(
                 By.XPATH, '//app-upload-tags-confirm-create-tags//mat-checkbox')
             if len(checkboxes) > 0:
+                print('Creating tags: %s' % self.CAMPAIGN_NAME)
                 for checkbox in checkboxes:
                     checkbox.click()
                 driver.find_element(*CONF_LOCATOR).click()
-                WebDriverWait(driver, 300).until(EC.element_to_be_clickable(CONF_LOCATOR))
+                WebDriverWait(driver, 200).until(EC.element_to_be_clickable(CONF_LOCATOR))
             time.sleep(3)
             driver.find_element(*CONF_LOCATOR).click()
 
         # Make sure the "processing" button worked
         WebDriverWait(driver, 30).until(EC.url_changes(driver.current_url))
-        print('---Fields mapped for %s upload---' % upload_type)
+        print('---Fields mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
 
-    def confirm_upload(self):
+    def confirm_upload(self, from_list=False):
         driver = self.driver
-        # Wait for upload to process
-        print("Upload processing...")
-        WebDriverWait(driver, 300).until(
-            EC.presence_of_element_located((By.TAG_NAME, 'snack-bar-container'))
-        )
-        driver.find_element(By.CSS_SELECTOR, 'snack-bar-container .link').click()
-        print("Upload processed")
-
+        # Option 1: Confirm from snackbar right after upload.
+        if not from_list:
+            # Wait for upload to process
+            print("Upload processing...")
+            WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.TAG_NAME, 'snack-bar-container'))
+            )
+            driver.find_element(By.CSS_SELECTOR, 'snack-bar-container .link').click()
+            print("Upload processed")
+        # Option 2: Confirm from upload list.
+        else:
+            driver.get(self.BASE_URL + '/admin/upload/list')
+            status = WebDriverWait(driver, 20).until(EC.presence_of_element_located(
+                (By.XPATH, self.STATUS_XPATH % self.CAMPAIGN_NAME)))
+            status.click()
+        # Ignore errors
+        if 'review' in driver.current_url:
+            WebDriverWait(driver, 20).until(EC.element_to_be_clickable(
+                (By.LINK_TEXT, 'Continue without re-uploading.'))).click()
         # Confirm upload
         WebDriverWait(driver, 20).until(EC.title_contains('Upload Confirm'))
         for checkbox in driver.find_elements(By.XPATH, '//mat-checkbox//label'):
@@ -167,7 +179,7 @@ class ABUploader:
         driver.get(self.BASE_URL + '/admin/upload/list')
         status = WebDriverWait(driver, 20).until(EC.presence_of_element_located(
             (By.XPATH, self.STATUS_XPATH % self.CAMPAIGN_NAME)))
-        print("Upload is %s" % status.text)
+        print("Upload is %s — %s" % (status.text, self.CAMPAIGN_NAME))
         return status.text
 
 
@@ -187,7 +199,8 @@ class ABUploader:
                 driver.refresh()
                 retries -= 1
                 timeout *= 2
-                print('Upload in progress. %d retries remaining' % retries)
+                print('Upload in progress. %d retries remaining (%s)' %
+                      (retries, self.CAMPAIGN_NAME))
         print("---Upload Complete---")
 
 

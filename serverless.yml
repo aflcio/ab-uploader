@@ -81,6 +81,20 @@ functions:
           event: s3:ObjectCreated:*
           rules:
             - suffix: .txt
+  one_ata_time:
+    handler: handler.one_ata_time
+    layers:
+      - { Ref: PythonRequirementsLambdaLayer }
+    environment:
+      stateMachineArn: "arn:aws:states:us-east-1:233111011430:stateMachine:abUploadMachine-aft"
+      # stateMachineArn: "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:abUploadMachine-${opt:stage}"
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - "states:ListExecutions"
+        Resource:
+          - "arn:aws:states:us-east-1:233111011430:stateMachine:abUploadMachine-aft"
+          # - "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:abUploadMachine-${opt:stage}"
   start_upload:
     handler: handler.start_upload
     layers:
@@ -92,24 +106,65 @@ functions:
     layers:
       - { Ref: PythonRequirementsLambdaLayer }
       - { Ref: ChromeLambdaLayer }
-    timeout: 30
+    timeout: 80
+  # confirm_upload:
+  #   handler: handler.confirm_upload
+  #   layers:
+  #     - { Ref: PythonRequirementsLambdaLayer }
+  #     - { Ref: ChromeLambdaLayer }
+  #   timeout: 60
 
 stepFunctions:
   stateMachines:
     uploadFunc:
       id: AbUploadMachine
       name: abUploadMachine-${opt:stage}
+      loggingConfig:
+        level: ERROR
+        includeExecutionData: true
+        destinations:
+          - Fn::GetAtt: [AbUploadMachineLogGroup, Arn]
+      tracingConfig:
+        enabled: true
       definition:
         Comment: "Handles Action Builder uploads"
-        StartAt: StartUpload
+        StartAt: OneAtATime
         States:
+          OneAtATime:
+            Type: Task
+            Resource:
+              Fn::GetAtt: [one_ata_time, Arn]
+            Next: ProceedChoice
+          ProceedChoice:
+            Type: Choice
+            Choices:
+              - Variable: $.proceed # check if this execution should proceed
+                BooleanEquals: True
+                Next: StartUpload
+            Default: WaitToProceed
+          WaitToProceed:
+            Type: Wait
+            Seconds: 60
+            Next: OneAtATime
           StartUpload:
             Type: Task
             Resource:
               Fn::GetAtt: [start_upload, Arn]
             Next: WaitForUpload
             Retry:
-              - ErrorEquals: [TimeoutException]
+              - ErrorEquals:
+                - TimeoutException
+                - Lambda.Unknown
+                IntervalSeconds: 20
+                MaxAttempts: 3
+                BackoffRate: 1.5
+          # ConfirmUpload:
+          #   Type: Task
+          #   Resource:
+          #     Fn::GetAtt: [confirm_upload, Arn]
+          #   Next: WaitForUpload
+          #   Retry:
+          #     - ErrorEquals: [TimeoutException]
           WaitForUpload:
             Type: Wait
             SecondsPath: "$.wait_time"
@@ -120,10 +175,18 @@ stepFunctions:
               Fn::GetAtt: [check_status, Arn]
             Next: UploadStatusChoice
             Retry:
-              - ErrorEquals: [TimeoutException]
+              - ErrorEquals:
+                - TimeoutException
+                - Lambda.Unknown
+                IntervalSeconds: 5
+                MaxAttempts: 3
+                BackoffRate: 2
           UploadStatusChoice:
             Type: Choice
             Choices:
+            - Variable: $.upload_status
+              StringMatches: Needs*
+              Next: WaitForUpload
             - And:
                 - Variable: $.upload_status
                   StringMatches: Complete*
@@ -170,3 +233,7 @@ resources:
                 - 'arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*'
               Principal:
                 AWS: ${param:s3_user}
+    AbUploadMachineLogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/states/abUploadMachine-${opt:stage}

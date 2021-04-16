@@ -7,7 +7,7 @@
   "devDependencies": {
     "serverless-iam-roles-per-function": "^2.0.2",
     "serverless-python-requirements": "^5.1.0",
-    "serverless-step-functions": "^2.21.1"
+    "serverless-step-functions": "^2.26.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
