@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Action Builder Uploader",
   "main": "upload.py",
-  "dependencies": {},
   "devDependencies": {
     "serverless-iam-roles-per-function": "^2.0.2",
     "serverless-python-requirements": "^5.1.0",
