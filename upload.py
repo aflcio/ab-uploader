@@ -11,7 +11,7 @@ import yaml
 
 class ABUploader:
 
-    STATUS_XPATH = "//app-upload-list//a[text()='%s']/../following-sibling::div[2]"
+    STATUS_XPATH = "//app-upload-list-page//a[text()='%s']/../following-sibling::div[2]"
 
     def __init__(self, config, upload_file=None, chrome_options=None, no_login=False):
         self.driver = webdriver.Chrome(chrome_options=chrome_options)
@@ -66,16 +66,28 @@ class ABUploader:
     def start_upload(self, upload_type):
         driver = self.driver
         if 'people' in upload_type:
-            driver.get(self.BASE_URL + '/admin/upload/people/mapping')
+            driver.get(self.BASE_URL + '/admin/upload/entities/mapping')
         if 'info' in upload_type:
-            driver.get(self.BASE_URL + '/admin/upload/tags/mapping')
+            driver.get(self.BASE_URL + '/admin/upload/fields')
         print("Starting %s upload: %s" % (upload_type, self.CAMPAIGN_NAME))
         WebDriverWait(driver, 20).until(EC.title_contains("Upload"))
         # Upload file
         driver.find_element_by_css_selector('input[type="file"]').send_keys(self.UPLOAD_FILE)
         # Select campaign
-        driver.find_element(
-            By.XPATH, "//mat-select[@data-test-id='campaignUploadSelect']").send_keys(self.CAMPAIGN_NAME)
+        campaign_select = driver.find_element(By.CSS_SELECTOR, ".mapping app-campaign-select2")
+        campaign_select.click()
+        campaign_select.find_element(By.TAG_NAME, "input").send_keys(self.CAMPAIGN_NAME)
+        time.sleep(1)
+        for item in campaign_select.find_elements(By.TAG_NAME, "app-list-item"):
+            if item.text == self.CAMPAIGN_NAME:
+                item.click()
+                break
+        # Select People entity type
+        entity_select = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//mat-select[@placeholder='Entity Type']")))
+        entity_select.send_keys('People')
+
+        # driver.find_element(
+        #     By.XPATH, "//mat-select[@data-test-id='campaignUploadSelect']").send_keys(self.CAMPAIGN_NAME)
         # Select ID for matching
         ID_SOURCE = (By.XPATH, "//mat-select[@placeholder='Id to use for matching']")
         ID_DEST = (By.XPATH, "//mat-select[@placeholder='Upload Column'][@aria-disabled='false']")
@@ -97,7 +109,7 @@ class ABUploader:
                     if map_to:
                         field.find_element(By.TAG_NAME, 'mat-select').send_keys(map_to)
             time.sleep(3)
-            driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
+            driver.find_element(By.XPATH, "//button[contains(text(), 'Process Upload')]").click()
 
         if 'info' in upload_type:
             WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
@@ -108,29 +120,28 @@ class ABUploader:
                 col_name = field.find_element(
                     By.TAG_NAME, 'input').get_attribute('value')
                 if col_name in self.FIELD_MAP[upload_type]:
+                    field_info = self.FIELD_MAP[upload_type][col_name]
                     dest = field.find_element(By.XPATH, './following-sibling::*[2]')
-                    dest.find_element(By.XPATH, './/mat-select').click()
-                    driver.find_element(By.TAG_NAME, 'mat-option') \
-                        .send_keys(self.FIELD_MAP[upload_type][col_name]['type'])
-                    driver.find_element(By.TAG_NAME, 'mat-option').click()
+                    dest.find_element(By.TAG_NAME, 'button').click()
+                    # Select field
+                    driver.find_element(By.XPATH, '//app-field-search-inline//input').send_keys(field_info['name'])
                     try:
-                        field_span = dest.find_element(By.XPATH, './/span[normalize-space(text())="%s"]'
-                            % self.FIELD_MAP[upload_type][col_name]['name'])
-                        field_span.find_element(By.XPATH, './ancestor-or-self::li').click()
-                        field_span.click()
+                        driver.find_element(By.XPATH, '//app-field-search-inline//mat-list-option').click()
                     except NoSuchElementException:
                         # Clear dialog
                         driver.find_element(By.TAG_NAME, 'body').click()
-                        dest.find_element(By.CSS_SELECTOR, '.mapping__reset').click()
-            driver.find_element(By.CSS_SELECTOR, '.mapping button').click()
-            WebDriverWait(driver, 10).until(EC.title_contains('Map Response'))
-            driver.find_element(
-                By.XPATH, '//app-upload-tag-categories-mapping/div/div/button').click()
-            WebDriverWait(driver, 10).until(EC.title_contains('Upload Confirm'))
-            CONF_LOCATOR = (
-                By.XPATH, '//app-upload-tags-confirm-create-tags//button')
+                    if field_info['type'] == 'notes':
+                        driver.find_element(By.XPATH, '//mat-dialog-container//mat-select').send_keys(field_info['note_col'])
+                        driver.find_element(By.XPATH, "//mat-dialog-container//button[text()='Apply Field Mapping']").click()
+                        time.sleep(1)
+            driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
+            WebDriverWait(driver, 10).until(EC.title_contains('Map to responses'))
+            time.sleep(2)
+            driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
+            WebDriverWait(driver, 10).until(EC.title_contains('Create Responses'))
+            CONF_LOCATOR = (By.XPATH, '//app-upload-fields-step3-page//button')
             checkboxes = driver.find_elements(
-                By.XPATH, '//app-upload-tags-confirm-create-tags//mat-checkbox')
+                By.XPATH, '//app-upload-fields-step3-page//mat-checkbox//label')
             if len(checkboxes) > 0:
                 print('Creating tags: %s' % self.CAMPAIGN_NAME)
                 for checkbox in checkboxes:
@@ -151,10 +162,10 @@ class ABUploader:
         if not from_list:
             # Wait for upload to process
             print("Upload processing...")
-            WebDriverWait(driver, 60).until(
-                EC.presence_of_element_located((By.TAG_NAME, 'snack-bar-container'))
+            link = WebDriverWait(driver, 60).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, 'snack-bar-container .link'))
             )
-            driver.find_element(By.CSS_SELECTOR, 'snack-bar-container .link').click()
+            link.click()
             print("Upload processed")
         # Option 2: Confirm from upload list.
         else:

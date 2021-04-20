@@ -22,11 +22,9 @@ default_field_map: &default_field_map
       type: Field
       name: Sector
     notes:
-      type: Field
+      type: notes
       name: Notes Category
-    notes_note:
-      type: Notes
-      name: Notes Category
+      note_col: notes_note
 
 upload-test:
   campaign_name: Upload Test
