@@ -94,6 +94,8 @@ class ABUploader:
         FIELD_SOURCE = (By.CLASS_NAME, 'mapping__col--source')
         WebDriverWait(driver, 5).until(EC.element_to_be_clickable(ID_SOURCE))
         driver.find_element(*ID_SOURCE).send_keys(self.FIELD_MAP['id']['ab_type'])
+        WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
+        driver.find_element(*ID_DEST).send_keys(self.FIELD_MAP['id']['column'])
         # Map Fields
         print("Mapping %s fields: %s" % (upload_type, self.CAMPAIGN_NAME))
         if 'people' in upload_type:
@@ -102,18 +104,22 @@ class ABUploader:
             for field in fields[:-2]:  # last two are notification and button
                 if field.find_elements(*col_name):
                     column = field.find_element(*col_name).get_attribute('value')
-                    if column == self.FIELD_MAP['id']['column']:
-                        map_to = self.FIELD_MAP['id']['ab_type']
-                    else:
-                        map_to = self.FIELD_MAP[upload_type].get(column)
+                    map_to = self.FIELD_MAP[upload_type].get(column)
                     if map_to:
-                        field.find_element(By.TAG_NAME, 'mat-select').send_keys(map_to)
+                        element = field.find_element(By.TAG_NAME, 'mat-select')
+                        self.select_value(element, map_to)
+                        if map_to == 'Email':
+                            type_element = field.find_element(By.XPATH, "//mat-select[@placeholder='Email Type']")
+                            type_value = self.FIELD_MAP[upload_type].get('email_type')
+                            self.select_value(type_element, type_value)
+                        if map_to == 'Phone Number':
+                            type_element = field.find_element(By.XPATH, "//mat-select[@placeholder='Phone Type']")
+                            type_value = self.FIELD_MAP[upload_type].get('phone_type')
+                            self.select_value(type_element, type_value)
             time.sleep(3)
             driver.find_element(By.XPATH, "//button[contains(text(), 'Process Upload')]").click()
 
         if 'info' in upload_type:
-            WebDriverWait(driver, 5).until(EC.presence_of_element_located(ID_DEST))
-            driver.find_element(*ID_DEST).send_keys(self.FIELD_MAP['id']['column'])
             WebDriverWait(driver, 5).until(lambda d: len(d.find_elements(*FIELD_SOURCE)) > 1)
             fields = driver.find_elements(*FIELD_SOURCE)
             for field in fields[1:]:
@@ -155,6 +161,17 @@ class ABUploader:
         WebDriverWait(driver, 30).until(EC.url_changes(driver.current_url))
         print('---Fields mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
+
+    def select_value(self, element, value):
+        element.click()
+        time.sleep(1)
+        options = element.find_elements(By.XPATH, '//mat-option')
+        for option in options:
+            if option.text == value:
+                option.click()
+                return
+        # If no match found, select blank option
+        options[0].click()
 
     def confirm_upload(self, from_list=False):
         driver = self.driver

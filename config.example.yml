@@ -7,13 +7,14 @@ default_field_map: &default_field_map
   people: &default_people_map
       first_name: First Name
       last_name: Last Name
-      email: Email
+      email1: Email
+      email_type: Home # Home / Work
       cell: Phone Number
-      phone_type: Phone Number Type
-      address: Address
+      phone_type: Work # Home / Mobile / Work
+      address: Street Address
       city: City
       state: State
-      zip: Zip
+      zip: Zip/Postal Code
   info: &default_info_map
     local:
       type: Field
