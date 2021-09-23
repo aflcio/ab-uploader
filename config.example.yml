@@ -26,6 +26,13 @@ default_field_map: &default_field_map
       type: notes
       name: Notes Category
       note_col: notes_note
+    worksite:
+      type: address
+      name: Worksite
+      street_col: worksite_street
+      city_col: worksite_city
+      state_col: worksite_state
+      zip_col: worksite_zip
 
 upload-test:
   campaign_name: Upload Test
