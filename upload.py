@@ -103,15 +103,15 @@ class ABUploader:
                 map_to = self.FIELD_MAP[upload_type].get(column)
                 if map_to:
                     element = field.find_element(By.TAG_NAME, 'mat-select')
-                    self.do_column_map(element, map_to)
+                    self.do_column_map(element, column, map_to)
                     if map_to == 'Email':
                         type_element = field.find_element(By.XPATH, "//mat-select[@placeholder='Email Type']")
                         type_value = self.FIELD_MAP[upload_type].get('email_type')
-                        self.do_column_map(type_element, type_value)
+                        self.do_column_map(type_element, 'Email Type',type_value)
                     if map_to == 'Phone Number':
                         type_element = field.find_element(By.XPATH, "//mat-select[@placeholder='Phone Type']")
                         type_value = self.FIELD_MAP[upload_type].get('phone_type')
-                        self.do_column_map(type_element, type_value)
+                        self.do_column_map(type_element, 'Phone Type', type_value)
             time.sleep(3)
             driver.find_element(By.XPATH, "//button[contains(text(), 'Process Upload')]").click()
 
@@ -121,25 +121,27 @@ class ABUploader:
                 if column in self.FIELD_MAP[upload_type]:
                     field_info = self.FIELD_MAP[upload_type][column]
                     element = field.find_element(By.TAG_NAME, 'app-upload-field-selector')
-                    self.do_info_map(element, field_info['name'])
+                    self.do_info_map(element, column, field_info['name'])
                     if field_info['type'] == 'notes':
                         note_element = driver.find_element(By.XPATH, '//mat-dialog-container//mat-select')
-                        self.do_column_map(note_element, field_info.get('note_col'))
+                        self.do_column_map(note_element, column + '_note', field_info.get('note_col'))
                         driver.find_element(By.XPATH, "//mat-dialog-container//button[text()='Apply Field Mapping']").click()
                         time.sleep(1)
                     if field_info['type'] == 'address':
                         elements = driver.find_elements(By.XPATH, '//mat-dialog-container//mat-select')
-                        self.do_column_map(elements[0], field_info.get('street_col'))
-                        self.do_column_map(elements[1], field_info.get('city_col'))
-                        self.do_column_map(elements[2], field_info.get('state_col'))
-                        self.do_column_map(elements[3], field_info.get('zip_col'))
-                        self.do_column_map(elements[4], field_info.get('lat_col'))
-                        self.do_column_map(elements[5], field_info.get('lon_col'))
+                        self.do_column_map(elements[0], column + '_street', field_info.get('street_col'))
+                        self.do_column_map(elements[1], column + '_city',field_info.get('city_col'))
+                        self.do_column_map(elements[2], column + '_state',field_info.get('state_col'))
+                        self.do_column_map(elements[3], column + '_zip',field_info.get('zip_col'))
+                        self.do_column_map(elements[4], column + '_lat',field_info.get('lat_col'))
+                        self.do_column_map(elements[5], column + '_lon',field_info.get('lon_col'))
                         driver.find_element(By.XPATH, "//mat-dialog-container//button[text()='Apply Field Mapping']").click()
                         time.sleep(1)
+            print('Finished field mapping')
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Map to responses'))
             time.sleep(2)
+            print('Finished response mapping')
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Create Responses'))
             CONF_LOCATOR = (By.XPATH, '//app-upload-fields-step3-page//button')
@@ -152,6 +154,7 @@ class ABUploader:
                 driver.find_element(*CONF_LOCATOR).click()
                 WebDriverWait(driver, 200).until(EC.element_to_be_clickable(CONF_LOCATOR))
             time.sleep(3)
+            print('Finished response creation')
             driver.find_element(*CONF_LOCATOR).click()
 
         # Make sure the "processing" button worked
@@ -159,23 +162,25 @@ class ABUploader:
         print('---Fields mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
 
-    def do_column_map(self, element, value):
+    def do_column_map(self, element, column, value):
         element.click()
         time.sleep(1)
         options = element.find_elements(By.XPATH, '//mat-option')
         for option in options:
             if option.text == value:
                 option.click()
+                print('Mapped %s to %s' % (column, value))
                 return
         # If no match found, select blank option
         options[0].click()
 
-    def do_info_map(self, element, value):
+    def do_info_map(self, element, column, value):
         element.click()
         time.sleep(1)
         for option in self.driver.find_elements(By.TAG_NAME, 'mat-list-option'):
             if option.text == value:
                 option.click()
+                print('Mapped %s to %s' % (column, value))
                 return
         # If no match found, clear the dialog
         self.driver.find_element(By.TAG_NAME, 'body').click()
