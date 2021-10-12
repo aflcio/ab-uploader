@@ -86,15 +86,14 @@ functions:
     layers:
       - { Ref: PythonRequirementsLambdaLayer }
     environment:
-      stateMachineArn: "arn:aws:states:us-east-1:233111011430:stateMachine:abUploadMachine-aft"
-      # stateMachineArn: "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:abUploadMachine-${opt:stage}"
+      # Can't use !Ref because of circular dependency
+      stateMachineArn: !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:abUploadMachine-${opt:stage}"
     iamRoleStatements:
       - Effect: "Allow"
         Action:
           - "states:ListExecutions"
         Resource:
-          - "arn:aws:states:us-east-1:233111011430:stateMachine:abUploadMachine-aft"
-          # - "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:abUploadMachine-${opt:stage}"
+          - !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:stateMachine:abUploadMachine-${opt:stage}"
   start_upload:
     handler: handler.start_upload
     layers:
@@ -107,12 +106,6 @@ functions:
       - { Ref: PythonRequirementsLambdaLayer }
       - { Ref: ChromeLambdaLayer }
     timeout: 80
-  # confirm_upload:
-  #   handler: handler.confirm_upload
-  #   layers:
-  #     - { Ref: PythonRequirementsLambdaLayer }
-  #     - { Ref: ChromeLambdaLayer }
-  #   timeout: 60
 
 stepFunctions:
   stateMachines:
@@ -158,13 +151,6 @@ stepFunctions:
                 IntervalSeconds: 20
                 MaxAttempts: 3
                 BackoffRate: 1.5
-          # ConfirmUpload:
-          #   Type: Task
-          #   Resource:
-          #     Fn::GetAtt: [confirm_upload, Arn]
-          #   Next: WaitForUpload
-          #   Retry:
-          #     - ErrorEquals: [TimeoutException]
           WaitForUpload:
             Type: Wait
             SecondsPath: "$.wait_time"
