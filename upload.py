@@ -113,6 +113,9 @@ class ABUploader:
                         type_value = self.FIELD_MAP[upload_type].get('phone_type')
                         self.do_column_map(type_element, 'Phone Type', type_value)
             time.sleep(3)
+            validation_errors = [e.text for e in driver.find_elements(By.CLASS_NAME, 'error')]
+            if validation_errors:
+                raise DataError('\n'.join(validation_errors))
             driver.find_element(By.XPATH, "//button[contains(text(), 'Process Upload')]").click()
 
         if 'info' in upload_type:
@@ -253,3 +256,6 @@ class ABUploader:
         print('Title: %s' % self.driver.title)
         print('URL: %s' % self.driver.current_url)
         print(self.driver.get_log('browser'))
+
+class DataError(Exception):
+    pass

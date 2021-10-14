@@ -106,6 +106,23 @@ functions:
       - { Ref: PythonRequirementsLambdaLayer }
       - { Ref: ChromeLambdaLayer }
     timeout: 80
+  notify:
+    handler: handler.notify
+    environment:
+      notifyTopic: !Ref NotifyTopic
+    layers:
+      - { Ref: PythonRequirementsLambdaLayer }
+    iamRoleStatements:
+      - Effect: "Allow"
+        Action:
+          - "sns:Publish"
+        Resource:
+          - !Ref NotifyTopic
+      - Effect: "Allow"
+        Action:
+          - "states:GetExecutionHistory"
+        Resource:
+          - !Sub "arn:aws:states:${AWS::Region}:${AWS::AccountId}:execution:abUploadMachine-${opt:stage}:*"
 
 stepFunctions:
   stateMachines:
@@ -119,6 +136,11 @@ stepFunctions:
           - Fn::GetAtt: [AbUploadMachineLogGroup, Arn]
       tracingConfig:
         enabled: true
+      notifications:
+        FAILED:
+          - lambda: !GetAtt NotifyLambdaFunction.Arn
+        SUCCEEDED:
+          - lambda: !GetAtt NotifyLambdaFunction.Arn
       definition:
         Comment: "Handles Action Builder uploads"
         StartAt: OneAtATime
@@ -133,12 +155,16 @@ stepFunctions:
             Choices:
               - Variable: $.proceed # check if this execution should proceed
                 BooleanEquals: True
-                Next: StartUpload
+                Next: NotifyStart
             Default: WaitToProceed
           WaitToProceed:
             Type: Wait
             Seconds: 60
             Next: OneAtATime
+          NotifyStart:
+            Type: Task
+            Resource: !GetAtt notify.Arn
+            Next: StartUpload
           StartUpload:
             Type: Task
             Resource:
@@ -223,3 +249,10 @@ resources:
       Type: AWS::Logs::LogGroup
       Properties:
         LogGroupName: /aws/states/abUploadMachine-${opt:stage}
+    NotifyTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ABUploadTopic-${opt:stage}
+        Subscription:
+          - Protocol: email
+            Endpoint: jmann@aflcio.org

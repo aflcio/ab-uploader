@@ -2,6 +2,7 @@ import boto3
 import json
 import os
 import time
+from datetime import datetime
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from urllib.parse import unquote_plus
@@ -177,3 +178,75 @@ def confirm_upload(event, context):
     uploader.confirm_upload(from_list=True)
     del event['wait_time'], event['retries_left']
     return event
+
+
+def notify(event, context):
+    if 'detail' in event:
+        job_info = json.loads(event['detail']['input'])
+        status = event['detail']['status']
+    else:
+        job_info = event
+        status = 'STARTED'
+
+    subject = "[ABUploader] JOB %s" % status
+    msg_params = {
+        "campaign": job_info['config']['campaign_name'],
+        "file": job_info['file_key'],
+        "instance": job_info['config']['instance'],
+        "execution": job_info['execution_name'],
+        "error": None,
+        "errorDetails": None
+    }
+
+    if status == 'STARTED':
+        msg_params['text'] = "File received. Starting uploads now!"
+    if status == 'FAILED':
+        msg_params['text'] = "The upload job could not be completed succesfully."
+        get_errors(msg_params, exec_arn=event['detail']['executionArn'])
+    if status == 'SUCCEEDED':
+        msg_params['text'] = "The upload job finished successfully."
+
+    send_notification(subject, msg_params)
+    return event
+
+def get_errors(msg_params, exec_arn):
+    sfn_client = boto3.client('stepfunctions')
+    result = sfn_client.get_execution_history(
+        executionArn=exec_arn,
+        maxResults=1,
+        reverseOrder=True
+    )
+    cause = json.loads(result['events'][0]['executionFailedEventDetails']['cause'])
+    msg_params['error'] = cause['errorType']
+    trace = [s.strip() for s in cause['stackTrace']]
+    if msg_params['error'] == 'DataError':
+        msg_params['errorDetails'] = cause['errorMessage']
+    else:
+        msg_params['errorDetails'] = '\n'.join(trace)
+
+
+def send_notification(subject, msg_params):
+    sns_client = boto3.client('sns')
+    msg = """{text}
+--------------------------------------------------------------------------------
+Job Details
+--------------------------------------------------------------------------------
+Campaign    :   {campaign}
+File Name    :   {file}
+Instance       :   {instance}
+Exec. ID       :   {execution}
+--------------------------------------------------------------------------------
+""".format_map(msg_params)
+
+    if msg_params['error']:
+        msg += """Error: {error}
+--------------------------------------------------------------------------------
+{errorDetails}
+--------------------------------------------------------------------------------
+""".format_map(msg_params)
+    msg += datetime.now().isoformat()
+    sns_client.publish(
+        TopicArn=os.getenv('notifyTopic'),
+        Message=msg,
+        Subject=subject
+    )
