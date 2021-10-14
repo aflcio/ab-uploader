@@ -171,7 +171,11 @@ class ABUploader:
         options = element.find_elements(By.XPATH, '//mat-option')
         for option in options:
             if option.text == value:
-                option.click()
+                if 'mat-selected' in option.get_attribute('class'):
+                    # Already selected, so clear dropdown
+                    self.driver.find_element(By.TAG_NAME, 'body').click()
+                else:
+                    option.click()
                 print('Mapped %s to %s' % (column, value))
                 return
         # If no match found, select blank option
