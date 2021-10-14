@@ -118,13 +118,6 @@ def start_upload(event, context):
     print('---Starting Upload: %s - %s---' %
           (event['campaign_key'], event['upload_type']))
     uploader.start_upload(event['upload_type'])
-    # if event['upload_type'] == 'info':
-    #     # Confirm info uploads with snackbar
-    #     uploader.confirm_upload()
-    #     event['wait_type'] = 'upload'
-    # else:
-    #     # For person uploads, check upload list
-    #     event['wait_type'] = 'processing'
 
     try:
         # Try waiting for snackbar pop-up
