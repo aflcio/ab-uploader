@@ -124,7 +124,7 @@ class ABUploader:
                 if column in self.FIELD_MAP[upload_type]:
                     field_info = self.FIELD_MAP[upload_type][column]
                     element = field.find_element(By.TAG_NAME, 'app-upload-field-selector')
-                    self.do_info_map(element, column, field_info['name'])
+                    self.do_info_map(element, column, field_info)
                     if field_info['type'] == 'notes':
                         note_element = driver.find_element(By.XPATH, '//mat-dialog-container//mat-select')
                         self.do_column_map(note_element, column + '_note', field_info.get('note_col'))
@@ -181,13 +181,16 @@ class ABUploader:
         # If no match found, select blank option
         options[0].click()
 
-    def do_info_map(self, element, column, value):
+    def do_info_map(self, element, column, field_info):
         element.click()
         time.sleep(1)
-        for option in self.driver.find_elements(By.TAG_NAME, 'mat-list-option'):
-            if option.text == value:
+        section_found = False if field_info.get('section') else True
+        for option in self.driver.find_elements(By.CSS_SELECTOR, 'mat-list-option, mat-subheader'):
+            if not section_found and option.text == field_info.get('section').upper():
+                section_found = True
+            if option.text == field_info['name'] and section_found:
                 option.click()
-                print('Mapped %s to %s' % (column, value))
+                print('Mapped %s to %s' % (column, field_info['name']))
                 return
         # If no match found, clear the dialog
         self.driver.find_element(By.TAG_NAME, 'body').click()

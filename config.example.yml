@@ -19,6 +19,7 @@ default_field_map: &default_field_map
     local:
       type: Field
       name: 'Local #'
+      section: Union Information
     sector:
       type: Field
       name: Sector
