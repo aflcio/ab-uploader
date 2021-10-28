@@ -143,7 +143,7 @@ class ABUploader:
             print('Finished field mapping')
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Map to responses'))
-            time.sleep(2)
+            WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, 'app-upload-tag-category-map')))
             print('Finished response mapping')
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Create Responses'))
