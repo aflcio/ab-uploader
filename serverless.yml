@@ -100,6 +100,7 @@ functions:
       - { Ref: PythonRequirementsLambdaLayer }
       - { Ref: ChromeLambdaLayer }
     timeout: 500
+    memorySize: 2048
   check_status:
     handler: handler.check_upload_status
     layers:

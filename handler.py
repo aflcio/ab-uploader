@@ -212,7 +212,7 @@ def get_errors(msg_params, exec_arn):
     cause = json.loads(result['events'][0]['executionFailedEventDetails']['cause'])
     msg_params['error'] = cause['errorType']
     trace = [s.strip() for s in cause['stackTrace']]
-    if msg_params['error'] == 'DataError':
+    if msg_params['error'] in ['DataError', 'CampaignError']:
         msg_params['errorDetails'] = cause['errorMessage']
     else:
         msg_params['errorDetails'] = '\n'.join(trace)

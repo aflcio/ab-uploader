@@ -76,14 +76,14 @@ class ABUploader:
         # Select campaign
         campaign_select = driver.find_element(By.CSS_SELECTOR, ".mapping app-campaign-select2")
         campaign_select.click()
-        campaign_select.find_element(By.TAG_NAME, "input").send_keys(self.CAMPAIGN_NAME)
         time.sleep(1)
-        for item in campaign_select.find_elements(By.TAG_NAME, "app-list-item"):
-            if item.text == self.CAMPAIGN_NAME:
-                item.click()
-                break
+        campaign = next((i for i in campaign_select.find_elements(By.TAG_NAME, "app-list-item") if i.text == self.CAMPAIGN_NAME), None)
+        if campaign is None:
+            raise CampaignError('Campaign %s not found' % self.CAMPAIGN_NAME)
+        campaign.click()
         # Select People entity type
-        entity_select = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.XPATH, "//mat-select[@placeholder='Entity Type']")))
+        time.sleep(1)
+        entity_select = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//mat-select[@placeholder='Entity Type']")))
         entity_select.send_keys('People')
 
         ID_SOURCE = (By.XPATH, "//mat-select[@placeholder='Id to use for matching']")
@@ -125,6 +125,7 @@ class ABUploader:
                     field_info = self.FIELD_MAP[upload_type][column]
                     element = field.find_element(By.TAG_NAME, 'app-upload-field-selector')
                     self.do_info_map(element, column, field_info)
+                    time.sleep(1)
                     if field_info['type'] == 'notes':
                         note_element = driver.find_element(By.XPATH, '//mat-dialog-container//mat-select')
                         self.do_column_map(note_element, column + '_note', field_info.get('note_col'))
@@ -265,4 +266,7 @@ class ABUploader:
         print(self.driver.get_log('browser'))
 
 class DataError(Exception):
+    pass
+
+class CampaignError(Exception):
     pass
