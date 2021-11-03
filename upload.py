@@ -38,7 +38,7 @@ class ABUploader:
         with open(config_path) as file:
             config = yaml.load(file, Loader=yaml.FullLoader)
         if campaign_key not in config:
-            raise Exception(
+            raise CampaignError(
                 'Could not find campaign %s in config file' % campaign_key)
         return {
             "instance": config['instance'],
@@ -76,6 +76,7 @@ class ABUploader:
         # Select campaign
         campaign_select = driver.find_element(By.CSS_SELECTOR, ".mapping app-campaign-select2")
         campaign_select.click()
+        campaign_select.find_element(By.TAG_NAME, "input").send_keys(self.CAMPAIGN_NAME[:5])
         time.sleep(1)
         campaign = next((i for i in campaign_select.find_elements(By.TAG_NAME, "app-list-item") if i.text == self.CAMPAIGN_NAME), None)
         if campaign is None:
