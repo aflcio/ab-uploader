@@ -6,7 +6,7 @@ Install [ChromeDriver](https://chromedriver.chromium.org) and update with the pa
 
 ```
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r --no-deps requirements.txt
 python local.py
 ```
 

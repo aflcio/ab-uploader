@@ -9,6 +9,7 @@ provider:
     S3_UPLOAD_BUCKET: ${self:service}-${opt:stage, self:provider.stage}-uploads
     AB_LOGIN: ${param:ab_login}
     AB_PASSWORD: ${param:ab_pass}
+    PARSONS_SKIP_IMPORT_ALL: True
   s3:
     uploadBucket:
       name: ${self:provider.environment.S3_UPLOAD_BUCKET}
@@ -34,6 +35,8 @@ custom:
     dockerizePip: non-linux
     slim: true
     layer: true
+    pipCmdExtraArgs:
+      - --no-deps
 
 layers:
   chrome:
@@ -100,7 +103,7 @@ functions:
       - { Ref: PythonRequirementsLambdaLayer }
       - { Ref: ChromeLambdaLayer }
     timeout: 500
-    memorySize: 2048
+    memorySize: 6144
   check_status:
     handler: handler.check_upload_status
     layers:
@@ -197,16 +200,16 @@ stepFunctions:
           UploadStatusChoice:
             Type: Choice
             Choices:
-            - Variable: $.upload_status
+            - Variable: $.current_status
               StringMatches: Needs*
               Next: WaitForUpload
             - And:
-                - Variable: $.upload_status
+                - Variable: $.current_status
                   StringMatches: Complete*
                 - Variable: $.uploads_todo
                   IsPresent: true
               Next: StartUpload
-            - Variable: "$.upload_status"
+            - Variable: "$.current_status"
               StringMatches: Complete*
               Next: AllSet
             - Variable: "$.retries_left"

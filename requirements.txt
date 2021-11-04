@@ -3,6 +3,8 @@ boto3==1.14.24
 botocore==1.17.24
 docutils==0.15.2
 jmespath==0.10.0
+parsons==0.17.2
+petl==1.6.8
 pycodestyle==2.6.0
 python-dateutil==2.8.1
 python-dotenv==0.14.0

@@ -2,7 +2,9 @@ import boto3
 import json
 import os
 import time
+from json.decoder import JSONDecodeError
 from datetime import datetime
+from parsons.etl import Table
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from urllib.parse import unquote_plus
@@ -33,7 +35,6 @@ def chrome_options():
 
 
 def s3_handler(event, context):
-    # print(event['Records'])
     record = event['Records'][0]
     bucket = record['s3']['bucket']['name']
     file_key = unquote_plus(record['s3']['object']['key'])
@@ -69,6 +70,12 @@ def handle_csv(bucket, file_key):
     uploads = list(config['field_map'])
     uploads.remove('id')
     execution_name = '%s_%s' % (campaign_key, int(time.time()))
+
+    # Split csv if needed
+    chunks = split_csv(file_key, bucket=bucket)
+    if chunks:
+        print('Splitting file in %d chunks' % chunks)
+        uploads = ['%s_%d' % (u, c)  for c in range(chunks) for u in uploads]
     # Start state machine
     sfn_client.start_execution(
         stateMachineArn=os.getenv('stateMachineArn'),
@@ -81,9 +88,34 @@ def handle_csv(bucket, file_key):
             "bucket": bucket,
             "campaign_key": campaign_key,
             "file_key": file_key,
-            "uploads_todo": uploads
+            "uploads_todo": uploads,
+            "upload_status": dict.fromkeys(uploads, ''),
+            "chunks": chunks
         })
     )
+
+
+def split_csv(file, chunk_size=10000, bucket=None):
+    csv = read_csv(file, bucket)
+    if csv.num_rows < chunk_size:
+        return False
+    for index, chunk in enumerate(csv.chunk(chunk_size)):
+        filename = '%s.%s' % (file, index)
+        write_csv(chunk, filename, bucket)
+    return index + 1 # (number of chunks)
+
+
+def read_csv(file, bucket=None):
+    if bucket:
+        return Table.from_s3_csv(bucket, file)
+    else:
+        return Table.from_csv(file)
+
+def write_csv(list, filename, bucket=None):
+    if bucket:
+        list.to_s3_csv(bucket, filename)
+    else:
+        list.to_csv(filename)
 
 
 def one_ata_time(event, context):
@@ -103,28 +135,33 @@ def one_ata_time(event, context):
 
 
 def start_upload(event, context):
+    event['current_upload'] = event['uploads_todo'].pop(0)
+    # If upload type ends with _N, we're dealing with a chunk
+    upload_type = event['current_upload']
+    chunk = upload_type.rsplit('_')[1] if '_' in upload_type else False
+    file_key = event['file_key'] if not chunk else '%s.%s' % (event['file_key'], chunk)
+    upload_type = upload_type if not chunk else upload_type.rsplit('_')[0]
     # Retrieve file to upload
-    file_path = '/tmp/%s' % event['file_key']
+    file_path = '/tmp/%s' % file_key
     s3_client.download_file(
         event['bucket'],
-        event['file_key'],
+        file_key,
         file_path
     )
 
-    event['upload_type'] = event['uploads_todo'].pop(0)
     uploader = ABUploader(config=event['config'],
                           upload_file=file_path,
                           chrome_options=chrome_options())
     print('---Starting Upload: %s - %s---' %
-          (event['campaign_key'], event['upload_type']))
-    uploader.start_upload(event['upload_type'])
+          (event['campaign_key'], event['current_upload']))
+    uploader.start_upload(upload_type)
 
     try:
         # Try waiting for snackbar pop-up
         uploader.confirm_upload()
         event['wait_type'] = 'upload'
         print('---Confirmed with snackbar: %s - %s---' %
-              (event['campaign_key'], event['upload_type']))
+              (event['campaign_key'], event['current_upload']))
     except TimeoutException:
         # Fall back to checking status on upload list
         event['wait_type'] = 'processing'
@@ -138,7 +175,9 @@ def check_upload_status(event, context):
     uploader = ABUploader(
         config=event['config'], chrome_options=chrome_options())
     status = uploader.get_upload_status()
-    event['upload_status'] = status
+    current = event['current_upload']
+    event['upload_status'][current] = status
+    event['current_status'] = status
     # Exponential backoff
     if 'retries_left' not in event:
         event['retries_left'] = 6
@@ -149,7 +188,7 @@ def check_upload_status(event, context):
     # Upload ready to be confirmed (Needs Confirmation/Review)
     if 'Needs' in status:
         uploader.confirm_upload(from_list=True)
-        print('---Confirmed Upload: %s - %s---' % (event['campaign_key'], event['upload_type']))
+        print('---Confirmed Upload: %s - %s---' % (event['campaign_key'], event['current_upload']))
         event['retries_left'] = 6
         event['wait_time'] = 30
         event['wait_type'] = 'upload'
@@ -158,7 +197,7 @@ def check_upload_status(event, context):
         del event['wait_time'], event['retries_left'], event['wait_type']
         if not len(event['uploads_todo']):
             del event['uploads_todo']
-        print('---Upload Complete: %s - %s---' % (event['campaign_key'], event['upload_type']))
+        print('---Upload Complete: %s - %s---' % (event['campaign_key'], event['current_upload']))
     # Upload failed
     if 'Failure' in status:
         raise Exception('Upload failed')
@@ -175,7 +214,7 @@ def confirm_upload(event, context):
 
 def notify(event, context):
     if 'detail' in event:
-        job_info = json.loads(event['detail']['input'])
+        job_info = get_job_info(event['detail']['executionArn'])
         status = event['detail']['status']
     else:
         job_info = event
@@ -188,7 +227,8 @@ def notify(event, context):
         "instance": job_info['config']['instance'],
         "execution": job_info['execution_name'],
         "error": None,
-        "errorDetails": None
+        "errorDetails": None,
+        "uploadStatus": "\n".join("%s:\t%s" % (u, s) for u, s in job_info['upload_status'].items()),
     }
 
     if status == 'STARTED':
@@ -202,6 +242,19 @@ def notify(event, context):
     send_notification(subject, msg_params)
     return event
 
+
+def get_job_info(exec_arn):
+    sfn_client = boto3.client('stepfunctions')
+    result = sfn_client.get_execution_history(
+        executionArn=exec_arn,
+        maxResults=5,
+        reverseOrder=True
+    )
+    details = [v for e in result['events'] for v in e.values() if isinstance(v, dict)]
+    info = next(v for d in details for k,v in d.items() if k == 'output' or k == 'input')
+    return json.loads(info)
+
+
 def get_errors(msg_params, exec_arn):
     sfn_client = boto3.client('stepfunctions')
     result = sfn_client.get_execution_history(
@@ -209,13 +262,16 @@ def get_errors(msg_params, exec_arn):
         maxResults=1,
         reverseOrder=True
     )
-    cause = json.loads(result['events'][0]['executionFailedEventDetails']['cause'])
-    msg_params['error'] = cause['errorType']
-    trace = [s.strip() for s in cause['stackTrace']]
-    if msg_params['error'] in ['DataError', 'CampaignError']:
-        msg_params['errorDetails'] = cause['errorMessage']
-    else:
-        msg_params['errorDetails'] = '\n'.join(trace)
+    try:
+        cause = json.loads(result['events'][0]['executionFailedEventDetails']['cause'])
+        msg_params['error'] = cause['errorType']
+        trace = [s.strip() for s in cause['stackTrace']]
+        if msg_params['error'] in ['DataError', 'CampaignError']:
+            msg_params['errorDetails'] = cause['errorMessage']
+        else:
+            msg_params['errorDetails'] = '\n'.join(trace)
+    except JSONDecodeError:
+        msg_params['error'] = result['events'][0]['executionFailedEventDetails']['cause']
 
 
 def send_notification(subject, msg_params):
@@ -229,6 +285,8 @@ File Name    :   {file}
 Instance       :   {instance}
 Exec. ID       :   {execution}
 --------------------------------------------------------------------------------
+{uploadStatus}
+--------------------------------------------------------------------------------
 """.format_map(msg_params)
 
     if msg_params['error']:
@@ -238,6 +296,7 @@ Exec. ID       :   {execution}
 --------------------------------------------------------------------------------
 """.format_map(msg_params)
     msg += datetime.now().isoformat()
+    print(msg)
     sns_client.publish(
         TopicArn=os.getenv('notifyTopic'),
         Message=msg,
