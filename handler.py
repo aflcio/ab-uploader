@@ -95,7 +95,7 @@ def handle_csv(bucket, file_key):
     )
 
 
-def split_csv(file, chunk_size=10000, bucket=None):
+def split_csv(file, chunk_size=5000, bucket=None):
     csv = read_csv(file, bucket)
     if csv.num_rows < chunk_size:
         return False
@@ -165,7 +165,6 @@ def start_upload(event, context):
     except TimeoutException:
         # Fall back to checking status on upload list
         event['wait_type'] = 'processing'
-    # event['wait_type'] = 'processing'
     event['wait_time'] = 30
     return event
 
@@ -178,26 +177,31 @@ def check_upload_status(event, context):
     current = event['current_upload']
     event['upload_status'][current] = status
     event['current_status'] = status
-    # Exponential backoff
+    event['next_move'] = 'keep_waiting'
+    # Exponential backoff (max 62 minutes)
     if 'retries_left' not in event:
-        event['retries_left'] = 6
-        event['wait_time'] = 30
+        event['retries_left'] = 14
+        event['wait_time'] = 60
     else:
         event['retries_left'] -= 1
-        event['wait_time'] *= 2
+        event['wait_time'] = min(event['wait_time'] * 2, 300)
     # Upload ready to be confirmed (Needs Confirmation/Review)
     if 'Needs' in status:
         uploader.confirm_upload(from_list=True)
-        print('---Confirmed Upload: %s - %s---' % (event['campaign_key'], event['current_upload']))
+        print('---Confirmed Upload: %s - %s---' % (event['campaign_key'], current))
         event['retries_left'] = 6
         event['wait_time'] = 30
         event['wait_type'] = 'upload'
     # Upload is done
     if 'Complete' in status:
-        del event['wait_time'], event['retries_left'], event['wait_type']
+        print('---Upload Complete: %s - %s---' % (event['campaign_key'], current))
+        # Cleanup our state variables before next upload
+        del event['wait_time'], event['retries_left'], event['wait_type'],
+        del event['current_status'], event['current_upload']
+        event['next_move'] = 'next_upload'
         if not len(event['uploads_todo']):
             del event['uploads_todo']
-        print('---Upload Complete: %s - %s---' % (event['campaign_key'], event['current_upload']))
+            event['next_move'] = 'all_done'
     # Upload failed
     if 'Failure' in status:
         raise Exception('Upload failed')

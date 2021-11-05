@@ -194,26 +194,23 @@ stepFunctions:
               - ErrorEquals:
                 - TimeoutException
                 - Lambda.Unknown
-                IntervalSeconds: 5
+                IntervalSeconds: 20
                 MaxAttempts: 3
-                BackoffRate: 2
+                BackoffRate: 1.5
           UploadStatusChoice:
             Type: Choice
             Choices:
-            - Variable: $.current_status
-              StringMatches: Needs*
-              Next: WaitForUpload
-            - And:
-                - Variable: $.current_status
-                  StringMatches: Complete*
-                - Variable: $.uploads_todo
-                  IsPresent: true
+            - Variable: $.next_move
+              StringEquals: next_upload
               Next: StartUpload
-            - Variable: "$.current_status"
-              StringMatches: Complete*
+            - Variable: $.next_move
+              StringEquals: all_done
               Next: AllSet
-            - Variable: "$.retries_left"
-              NumericGreaterThan: 0
+            - And:
+                - Variable: $.next_move
+                  StringEquals: keep_waiting
+                - Variable: $.retries_left
+                  NumericGreaterThan: 0
               Next: WaitForUpload
             Default: GiveUp
           GiveUp:
