@@ -70,9 +70,15 @@ def handle_csv(bucket, file_key):
     uploads = list(config['field_map'])
     uploads.remove('id')
     execution_name = '%s_%s' % (campaign_key, int(time.time()))
+    file_info = get_file_info(file_key, bucket)
+
+    # Skip files with no records
+    if file_info['rows'] == 0:
+        print('No records in file %s' % file_key)
+        return
 
     # Split csv if needed
-    chunks = split_csv(file_key, bucket=bucket)
+    chunks = split_csv(file_info)
     if chunks:
         print('Splitting file in %d chunks' % chunks)
         uploads = ['%s_%d' % (u, c)  for c in range(chunks) for u in uploads]
@@ -90,18 +96,27 @@ def handle_csv(bucket, file_key):
             "file_key": file_key,
             "uploads_todo": uploads,
             "upload_status": dict.fromkeys(uploads, ''),
-            "chunks": chunks
+            "chunks": chunks,
+            "total_rows": file_info['rows'],
         })
     )
 
 
-def split_csv(file, chunk_size=5000, bucket=None):
-    csv = read_csv(file, bucket)
-    if csv.num_rows < chunk_size:
+def get_file_info(file_key, bucket=None):
+    csv = read_csv(file_key, bucket)
+    return {
+        "file_key": file_key,
+        "bucket": bucket,
+        "rows": csv.num_rows,
+        "csv": csv
+    }
+
+def split_csv(file_info, chunk_size=5000):
+    if file_info['rows'] < chunk_size:
         return False
-    for index, chunk in enumerate(csv.chunk(chunk_size)):
-        filename = '%s.%s' % (file, index)
-        write_csv(chunk, filename, bucket)
+    for index, chunk in enumerate(file_info['csv'].chunk(chunk_size)):
+        filename = '%s.%s' % (file_info['file_key'], index)
+        write_csv(chunk, filename, file_info['bucket'])
     return index + 1 # (number of chunks)
 
 
