@@ -117,7 +117,14 @@ class ABUploader:
             validation_errors = [e.text for e in driver.find_elements(By.CLASS_NAME, 'error')]
             if validation_errors:
                 raise DataError('\n'.join(validation_errors))
-            driver.find_element(By.XPATH, "//button[contains(text(), 'Process Upload')]").click()
+            driver.find_element(By.XPATH, "//button[contains(text(), 'Review & Confirm')]").click()
+            WebDriverWait(driver, 30).until(EC.presence_of_element_located((By.XPATH, '//h3[contains(text(), "Review & Process Upload")]')))
+            print('---Fields mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
+            for checkbox in driver.find_elements(By.XPATH, '//mat-checkbox//label'):
+                checkbox.click()
+            button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(),"Process Upload")]')))
+            button.click()
+            print('---Upload confirmed for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
         if 'info' in upload_type:
             for field in fields:
@@ -142,11 +149,11 @@ class ABUploader:
                         self.do_column_map(elements[5], column + '_lon',field_info.get('lon_col'))
                         driver.find_element(By.XPATH, "//mat-dialog-container//button[text()='Apply Field Mapping']").click()
                         time.sleep(1)
-            print('Finished field mapping')
+            print('---Fields mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Map to responses'))
             WebDriverWait(driver, 20).until(EC.presence_of_element_located((By.TAG_NAME, 'app-upload-tag-category-map')))
-            print('Finished response mapping')
+            print('---Responses mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Create Responses'))
             CONF_LOCATOR = (By.XPATH, '//app-upload-fields-step3-page//button')
@@ -159,13 +166,8 @@ class ABUploader:
                 driver.find_element(*CONF_LOCATOR).click()
                 WebDriverWait(driver, 200).until(EC.element_to_be_clickable(CONF_LOCATOR))
             time.sleep(3)
-            print('Finished response creation')
+            print('---Responses created for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
             driver.find_element(*CONF_LOCATOR).click()
-
-        # Make sure the "processing" button worked
-        WebDriverWait(driver, 30).until(EC.url_changes(driver.current_url))
-        print('---Fields mapped for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
-
 
     def do_column_map(self, element, column, value):
         element.click()
@@ -196,35 +198,6 @@ class ABUploader:
                 return
         # If no match found, clear the dialog
         self.driver.find_element(By.TAG_NAME, 'body').click()
-
-
-    def confirm_upload(self, from_list=False):
-        driver = self.driver
-        # Option 1: Confirm from snackbar right after upload.
-        if not from_list:
-            # Wait for upload to process
-            print("Upload processing...")
-            link = WebDriverWait(driver, 60).until(
-                EC.presence_of_element_located((By.CSS_SELECTOR, 'snack-bar-container .link'))
-            )
-            link.click()
-            print("Upload processed")
-        # Option 2: Confirm from upload list.
-        else:
-            driver.get(self.BASE_URL + '/admin/upload/list')
-            status = WebDriverWait(driver, 20).until(EC.presence_of_element_located(
-                (By.XPATH, self.STATUS_XPATH % self.CAMPAIGN_NAME)))
-            status.click()
-        # Ignore errors
-        if 'review' in driver.current_url:
-            WebDriverWait(driver, 20).until(EC.element_to_be_clickable(
-                (By.LINK_TEXT, 'Continue without re-uploading.'))).click()
-        # Confirm upload
-        WebDriverWait(driver, 20).until(EC.title_contains('Upload Confirm'))
-        for checkbox in driver.find_elements(By.XPATH, '//mat-checkbox//label'):
-            checkbox.click()
-        driver.find_element(By.CSS_SELECTOR, 'app-upload-confirm button').click()
-        print('Confirmed upload, starting now...')
 
 
     def get_upload_status(self):

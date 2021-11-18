@@ -170,16 +170,6 @@ def start_upload(event, context):
     print('---Starting Upload: %s - %s---' %
           (event['campaign_key'], event['current_upload']))
     uploader.start_upload(upload_type)
-
-    try:
-        # Try waiting for snackbar pop-up
-        uploader.confirm_upload()
-        event['wait_type'] = 'upload'
-        print('---Confirmed with snackbar: %s - %s---' %
-              (event['campaign_key'], event['current_upload']))
-    except TimeoutException:
-        # Fall back to checking status on upload list
-        event['wait_type'] = 'processing'
     event['wait_time'] = 30
     return event
 
@@ -200,18 +190,11 @@ def check_upload_status(event, context):
     else:
         event['retries_left'] -= 1
         event['wait_time'] = min(event['wait_time'] * 2, 300)
-    # Upload ready to be confirmed (Needs Confirmation/Review)
-    if 'Needs' in status:
-        uploader.confirm_upload(from_list=True)
-        print('---Confirmed Upload: %s - %s---' % (event['campaign_key'], current))
-        event['retries_left'] = 6
-        event['wait_time'] = 30
-        event['wait_type'] = 'upload'
     # Upload is done
     if 'Complete' in status:
         print('---Upload Complete: %s - %s---' % (event['campaign_key'], current))
         # Cleanup our state variables before next upload
-        del event['wait_time'], event['retries_left'], event['wait_type'],
+        del event['wait_time'], event['retries_left']
         del event['current_status'], event['current_upload']
         event['next_move'] = 'next_upload'
         if not len(event['uploads_todo']):
@@ -220,14 +203,6 @@ def check_upload_status(event, context):
     # Upload failed
     if 'Failure' in status:
         raise Exception('Upload failed')
-    return event
-
-
-def confirm_upload(event, context):
-    uploader = ABUploader(
-        config=event['config'], chrome_options=chrome_options())
-    uploader.confirm_upload(from_list=True)
-    del event['wait_time'], event['retries_left']
     return event
 
 
