@@ -157,17 +157,20 @@ class ABUploader:
             driver.find_element(By.XPATH, '//button[contains(text(),"Next Step")]').click()
             WebDriverWait(driver, 10).until(EC.title_contains('Create Responses'))
             CONF_LOCATOR = (By.XPATH, '//app-upload-fields-step3-page//button')
-            checkboxes = driver.find_elements(
-                By.XPATH, '//app-upload-fields-step3-page//mat-checkbox//label')
-            if len(checkboxes) > 0:
+            if driver.find_element(*CONF_LOCATOR).text == 'Create Responses':
                 print('Creating tags: %s' % self.CAMPAIGN_NAME)
+                checkboxes = driver.find_elements(By.XPATH, '//app-upload-fields-step3-page//mat-checkbox//label')
                 for checkbox in checkboxes:
                     checkbox.click()
+                WebDriverWait(driver, 30).until(EC.element_to_be_clickable(CONF_LOCATOR))
                 driver.find_element(*CONF_LOCATOR).click()
-                WebDriverWait(driver, 200).until(EC.element_to_be_clickable(CONF_LOCATOR))
-            time.sleep(3)
-            print('---Responses created for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
+                WebDriverWait(driver, 300).until(EC.presence_of_element_located((By.XPATH, '//span[text()="Response Creation Results"]')))
+            checkboxes = driver.find_elements(By.XPATH, '//app-upload-fields-step3-page//mat-checkbox//label')
+            for checkbox in checkboxes:
+                checkbox.click()
+            WebDriverWait(driver, 30).until(EC.element_to_be_clickable(CONF_LOCATOR))
             driver.find_element(*CONF_LOCATOR).click()
+            print('---Responses created for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
     def do_column_map(self, element, column, value):
         element.click()
