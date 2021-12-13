@@ -40,6 +40,15 @@ upload-test:
   fields:
     <<: *default_field_map
 
+info-test:
+  campaign_name: Upload Test
+  fields:
+    id:
+      column: id
+      ab_type: Custom ID
+    info:
+      <<: *default_info_map
+
 campaign-foo:
   campaign_name: Foo Campaign
   fields:

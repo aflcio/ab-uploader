@@ -40,7 +40,9 @@ custom:
 
 layers:
   chrome:
-    path: chromelayer
+    package:
+      # From https://github.com/vittorio-nardone/selenium-chromium-lambda
+      artifact: chromelayer.zip
 
 package:
   individually: false

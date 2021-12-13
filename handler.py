@@ -12,26 +12,69 @@ from upload import ABUploader
 
 s3_client = boto3.client('s3')
 
+
+# See https://github.com/vittorio-nardone/selenium-chromium-lambda
 def chrome_options():
     chrome_options = webdriver.ChromeOptions()
-    chrome_options.add_argument('--headless')
-    chrome_options.add_argument('--no-sandbox')
-    chrome_options.add_argument('--disable-gpu')
-    chrome_options.add_argument('--window-size=1280x1696')
-    chrome_options.add_argument('--user-data-dir=/tmp/user-data')
-    chrome_options.add_argument('--hide-scrollbars')
-    chrome_options.add_argument('--enable-logging')
-    chrome_options.add_argument('--log-level=0')
-    chrome_options.add_argument('--v=99')
-    chrome_options.add_argument('--single-process')
-    chrome_options.add_argument('--data-path=/tmp/data-path')
-    chrome_options.add_argument('--ignore-certificate-errors')
-    chrome_options.add_argument('--homedir=/tmp')
-    chrome_options.add_argument('--disk-cache-dir=/tmp/cache-dir')
-    chrome_options.add_argument(
-        'user-agent=Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36')
-    chrome_options.binary_location = "/opt/bin/headless-chromium"
+
+    lambda_options = [
+        '--autoplay-policy=user-gesture-required',
+        '--disable-background-networking',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-breakpad',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-update',
+        '--disable-default-apps',
+        '--disable-dev-shm-usage',
+        '--disable-domain-reliability',
+        '--disable-extensions',
+        '--disable-features=AudioServiceOutOfProcess',
+        '--disable-hang-monitor',
+        '--disable-ipc-flooding-protection',
+        '--disable-notifications',
+        '--disable-offer-store-unmasked-wallet-cards',
+        '--disable-popup-blocking',
+        '--disable-print-preview',
+        '--disable-prompt-on-repost',
+        '--disable-renderer-backgrounding',
+        '--disable-setuid-sandbox',
+        '--disable-speech-api',
+        '--disable-sync',
+        '--disk-cache-size=33554432',
+        '--hide-scrollbars',
+        '--ignore-gpu-blacklist',
+        '--ignore-certificate-errors',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--no-default-browser-check',
+        '--no-first-run',
+        '--no-pings',
+        '--no-sandbox',
+        '--no-zygote',
+        '--password-store=basic',
+        '--use-gl=swiftshader',
+        '--use-mock-keychain',
+        '--single-process',
+        '--headless',
+        '--window-size=1280x1696',
+        '--user-data-dir=/tmp/user-data',
+        '--data-path=/tmp/data-path',
+        '--homedir=/tmp',
+        '--disk-cache-dir=/tmp/cache-dir'
+        ]
+    #chrome_options.add_argument('--disable-gpu')
+    for argument in lambda_options:
+        chrome_options.add_argument(argument)
+    chrome_options.binary_location = "/opt/bin/chromium"
+
     return chrome_options
+
+
+def test():
+    driver = webdriver.Chrome(options=chrome_options())
+    driver.get('http://aflcio.org')
+    print(driver.title)
 
 
 def s3_handler(event, context):
