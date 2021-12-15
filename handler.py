@@ -212,7 +212,7 @@ def start_upload(event, context):
                           chrome_options=chrome_options())
     print('---Starting Upload: %s - %s---' %
           (event['campaign_key'], event['current_upload']))
-    uploader.start_upload(upload_type)
+    event['upload_name'] = uploader.start_upload(upload_type)
     event['wait_time'] = 30
     return event
 
@@ -220,7 +220,7 @@ def start_upload(event, context):
 def check_upload_status(event, context):
     # Get status of upload
     uploader = ABUploader(
-        config=event['config'], chrome_options=chrome_options())
+        config=event['config'], upload_name=event['upload_name'], chrome_options=chrome_options())
     status = uploader.get_upload_status()
     current = event['current_upload']
     event['upload_status'][current] = status
@@ -238,7 +238,7 @@ def check_upload_status(event, context):
         print('---Upload Complete: %s - %s---' % (event['campaign_key'], current))
         # Cleanup our state variables before next upload
         del event['wait_time'], event['retries_left']
-        del event['current_status'], event['current_upload']
+        del event['current_status'], event['current_upload'], event['upload_name']
         event['next_move'] = 'next_upload'
         if not len(event['uploads_todo']):
             del event['uploads_todo']

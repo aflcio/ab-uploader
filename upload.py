@@ -1,7 +1,9 @@
 import csv
+import json
 import os
 import time
-from selenium import webdriver
+from seleniumwire import webdriver
+from seleniumwire.utils import decode
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support import expected_conditions as EC
@@ -11,11 +13,13 @@ import yaml
 
 class ABUploader:
 
-    STATUS_XPATH = "//app-upload-list-page//a[text()='%s']/../following-sibling::div[2]"
+    STATUS_XPATH = "//app-upload-list-page//div[.//child::a|span[text()='%s']]/../div[6]"
 
-    def __init__(self, config, upload_file=None, chrome_options=None, no_login=False):
+    def __init__(self, config, upload_file=None, upload_name=None, chrome_options=None, no_login=False):
         self.driver = webdriver.Chrome(chrome_options=chrome_options)
+        self.driver.scopes = ['.*actionbuilder.org/api/graphql']
         self.UPLOAD_FILE = upload_file
+        self.UPLOAD_NAME = upload_name
         self.CAMPAIGN_NAME = config['campaign_name']
         self.FIELD_MAP = config['field_map']
         self.BASE_URL = 'https://%s.actionbuilder.org' % config['instance']
@@ -124,6 +128,7 @@ class ABUploader:
                 checkbox.click()
             button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(),"Process Upload")]')))
             button.click()
+            WebDriverWait(driver, 10).until(EC.title_contains('View Uploads'))
             print('---Upload confirmed for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
         if 'info' in upload_type:
@@ -170,7 +175,18 @@ class ABUploader:
                 checkbox.click()
             WebDriverWait(driver, 30).until(EC.element_to_be_clickable(CONF_LOCATOR))
             driver.find_element(*CONF_LOCATOR).click()
+            WebDriverWait(driver, 10).until(EC.title_contains('View Uploads'))
             print('---Responses created for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
+
+        # Return AB's generated upload nmae
+        for req in reversed(driver.requests):
+                if json.loads(req.body.decode())['operationName'] == 'CreateUploadMutation':
+                    res_data = json.loads(decode(req.response.body, 'gzip').decode())['data']
+                    self.UPLOAD_NAME = res_data['createUpload']['upload']['name']
+                    return self.UPLOAD_NAME
+
+        # If not found, something went wrong
+        raise UploadError("Upload failed to start for %s: %s" % (upload_type, self.CAMPAIGN_NAME))
 
     def do_column_map(self, element, column, value):
         element.click()
@@ -207,7 +223,7 @@ class ABUploader:
         driver=self.driver
         driver.get(self.BASE_URL + '/admin/upload/list')
         status = WebDriverWait(driver, 20).until(EC.presence_of_element_located(
-            (By.XPATH, self.STATUS_XPATH % self.CAMPAIGN_NAME)))
+            (By.XPATH, self.STATUS_XPATH % self.UPLOAD_NAME)))
         print("Upload is %s — %s" % (status.text, self.CAMPAIGN_NAME))
         return status.text
 
@@ -215,7 +231,7 @@ class ABUploader:
     def finish_upload(self):
         driver = self.driver
         # Wait for upload to complete
-        STATUS_LOCATOR = (By.XPATH, self.STATUS_XPATH % self.CAMPAIGN_NAME)
+        STATUS_LOCATOR = (By.XPATH, self.STATUS_XPATH % self.UPLOAD_NAME)
         retries = 10
         timeout = 5
         while retries > 0:
@@ -246,4 +262,7 @@ class DataError(Exception):
     pass
 
 class CampaignError(Exception):
+    pass
+
+class UploadError(Exception):
     pass
