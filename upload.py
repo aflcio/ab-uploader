@@ -2,13 +2,13 @@ import csv
 import json
 import os
 import time
-from seleniumwire import webdriver
-from seleniumwire.utils import decode
+from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import yaml
 
 class ABUploader:
@@ -16,8 +16,9 @@ class ABUploader:
     STATUS_XPATH = "//app-upload-list-page//div[.//child::a|span[text()='%s']]/../div[6]"
 
     def __init__(self, config, upload_file=None, upload_name=None, chrome_options=None, no_login=False):
-        self.driver = webdriver.Chrome(chrome_options=chrome_options, seleniumwire_options={'mitm_http2': False})
-        self.driver.scopes = ['.*actionbuilder.org/api/graphql']
+        capabilities = DesiredCapabilities.CHROME.copy()
+        capabilities['goog:loggingPrefs'] = {'performance': 'ALL'}
+        self.driver = webdriver.Chrome(chrome_options=chrome_options, desired_capabilities=capabilities)
         self.UPLOAD_FILE = upload_file
         self.UPLOAD_NAME = upload_name
         self.CAMPAIGN_NAME = config['campaign_name']
@@ -183,10 +184,12 @@ class ABUploader:
             print('---Responses created for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
         # Return AB's generated upload nmae
-        for req in reversed(driver.requests):
-                if json.loads(req.body.decode())['operationName'] == 'CreateUploadMutation':
-                    res_data = json.loads(decode(req.response.body, 'gzip').decode())['data']
-                    self.UPLOAD_NAME = res_data['createUpload']['upload']['name']
+        logs = driver.get_log('performance')
+        for entry in reversed(logs):
+            for k,v in entry.items():
+                if k == 'message' and 'CreateUploadMutation' in v:
+                    msg = json.loads(v)['message']
+                    self.UPLOAD_NAME = json.loads(msg['params']['request']['postData'])['variables']['input']['name']
                     return self.UPLOAD_NAME
 
         # If not found, something went wrong
