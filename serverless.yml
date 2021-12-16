@@ -17,11 +17,11 @@ provider:
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
         BlockPublicPolicy: true
-
   iamRoleStatements:
     - Effect: "Allow"
       Action:
         - "s3:GetObject"
+        - "s3:PutObject"
       Resource:
         - 'arn:aws:s3:::${self:provider.environment.S3_UPLOAD_BUCKET}/*'
 

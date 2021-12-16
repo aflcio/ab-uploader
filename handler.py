@@ -45,6 +45,7 @@ def chrome_options():
         '--hide-scrollbars',
         '--ignore-gpu-blacklist',
         '--ignore-certificate-errors',
+        '--ignore-ssl-errors',
         '--metrics-recording-only',
         '--mute-audio',
         '--no-default-browser-check',

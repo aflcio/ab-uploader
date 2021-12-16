@@ -16,7 +16,7 @@ class ABUploader:
     STATUS_XPATH = "//app-upload-list-page//div[.//child::a|span[text()='%s']]/../div[6]"
 
     def __init__(self, config, upload_file=None, upload_name=None, chrome_options=None, no_login=False):
-        self.driver = webdriver.Chrome(chrome_options=chrome_options)
+        self.driver = webdriver.Chrome(chrome_options=chrome_options, seleniumwire_options={'mitm_http2': False})
         self.driver.scopes = ['.*actionbuilder.org/api/graphql']
         self.UPLOAD_FILE = upload_file
         self.UPLOAD_NAME = upload_name
@@ -128,7 +128,11 @@ class ABUploader:
                 checkbox.click()
             button = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, '//button[contains(text(),"Process Upload")]')))
             button.click()
-            WebDriverWait(driver, 10).until(EC.title_contains('View Uploads'))
+            try:
+                WebDriverWait(driver, 30).until(EC.title_contains('View Uploads'))
+            except TimeoutException:
+                self.test('upload-timeout.png')
+                raise
             print('---Upload confirmed for %s: %s---' % (upload_type, self.CAMPAIGN_NAME))
 
         if 'info' in upload_type:
@@ -253,10 +257,18 @@ class ABUploader:
         self.driver.quit()
 
 
-    def test(self):
+    def test(self, screenshot_name=None):
         print('Title: %s' % self.driver.title)
         print('URL: %s' % self.driver.current_url)
         print(self.driver.get_log('browser'))
+        if screenshot_name:
+            screenshot_path = '/tmp/%s' % screenshot_name
+            self.driver.save_screenshot(screenshot_path)
+            if os.getenv('S3_UPLOAD_BUCKET'):
+                import boto3
+                s3_client = boto3.client('s3')
+                s3_client.upload_file(screenshot_path, os.getenv('S3_UPLOAD_BUCKET'), screenshot_name)
+
 
 class DataError(Exception):
     pass
