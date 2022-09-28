@@ -2,6 +2,7 @@ import csv
 import json
 import os
 import time
+import chardet
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.common.exceptions import NoSuchElementException
@@ -29,7 +30,8 @@ class ABUploader:
 
     def txt_to_csv(txt_file):
         csv_file = txt_file.replace('.txt', '.csv')
-        with open(txt_file, "r") as in_text, open(csv_file, "w") as out_csv:
+        encoding = chardet.detect(open(txt_file, 'rb').read())['encoding']
+        with open(txt_file, "r", encoding=encoding) as in_text, open(csv_file, "w") as out_csv:
             # Strip <NUL> characters
             data = (line.replace('\0', '') for line in in_text)
             in_reader = csv.reader(data, delimiter='\t')
