@@ -37,6 +37,8 @@ class ABUploader:
             in_reader = csv.reader(data, delimiter='\t')
             out_writer = csv.writer(out_csv)
             for row in in_reader:
+                # Strip leading and trailing spaces
+                row = [col.strip() for col in row]
                 out_writer.writerow(row)
         return csv_file
 
